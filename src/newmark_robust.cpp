@@ -138,7 +138,7 @@ private:
 
 Eval evaluate(const NonlinearDynamicModel& model,const DynamicState& start,
               const std::vector<double>& u_trial,const std::vector<double>& u_pred,
-              const std::vector<double>& v_pred,double ag,SolverContext& ctx,
+              const std::vector<double>& v_pred,double ag,const std::vector<double>& constant_load,SolverContext& ctx,
               AnalysisStats& stats,std::string& last_error){
     const int n=model.dof();Eval e;
     e.norm=std::numeric_limits<double>::infinity();e.scale=1.0;
@@ -171,7 +171,7 @@ Eval evaluate(const NonlinearDynamicModel& model,const DynamicState& start,
     for(int i=0;i<n;++i)e.v[static_cast<std::size_t>(i)]=v_pred[static_cast<std::size_t>(i)]+gamma_dt*e.a[static_cast<std::size_t>(i)];
     auto cv=model.damping_multiply(e.v),ma=model.mass_multiply(e.a),p=model.base_excitation(ag);
     e.residual.resize(static_cast<std::size_t>(n));
-    for(int i=0;i<n;++i)e.residual[static_cast<std::size_t>(i)]=p[static_cast<std::size_t>(i)]-fint[static_cast<std::size_t>(i)]-cv[static_cast<std::size_t>(i)]-ma[static_cast<std::size_t>(i)];
+    for(int i=0;i<n;++i)e.residual[static_cast<std::size_t>(i)]=p[static_cast<std::size_t>(i)]+constant_load[static_cast<std::size_t>(i)]-fint[static_cast<std::size_t>(i)]-cv[static_cast<std::size_t>(i)]-ma[static_cast<std::size_t>(i)];
     e.norm=inf_norm(e.residual);e.scale=std::max(1.0,inf_norm(p));
     if(!std::isfinite(e.norm)||!std::isfinite(e.scale)||!all_finite(e.a)||!all_finite(e.v)){
         ++stats.nonfinite_evaluations;last_error="non-finite dynamic residual or kinematics";e.norm=std::numeric_limits<double>::infinity();
@@ -180,13 +180,14 @@ Eval evaluate(const NonlinearDynamicModel& model,const DynamicState& start,
 }
 
 EnergyLedger accepted_energy_increment(const NonlinearDynamicModel& model,const DynamicState& a,
-                                             const DynamicState& b,double ag0,double ag1,double dt){
+                                             const DynamicState& b,double ag0,double ag1,double dt,
+                                             const std::vector<double>& constant_load){
     EnergyLedger e;std::vector<double> du(a.u.size());for(std::size_t i=0;i<du.size();++i)du[i]=b.u[i]-a.u[i];
     std::vector<double> f0,t0,s0,f1,t1,s1;
     model.internal_force_and_tangent(a.u,a.committed,f0,t0,s0);
     model.internal_force_and_tangent(b.u,b.committed,f1,t1,s1);
     auto p0=model.base_excitation(ag0),p1=model.base_excitation(ag1);
-    std::vector<double> favg(f0.size()),pavg(p0.size());for(std::size_t i=0;i<favg.size();++i){favg[i]=0.5*(f0[i]+f1[i]);pavg[i]=0.5*(p0[i]+p1[i]);}
+    std::vector<double> favg(f0.size()),pavg(p0.size());for(std::size_t i=0;i<favg.size();++i){favg[i]=0.5*(f0[i]+f1[i]);pavg[i]=0.5*(p0[i]+p1[i])+constant_load[i];}
     e.internal=vec_dot(favg,du);e.input=vec_dot(pavg,du);
     auto cv0=model.damping_multiply(a.v),cv1=model.damping_multiply(b.v);
     e.damping=0.5*dt*(vec_dot(a.v,cv0)+vec_dot(b.v,cv1));
@@ -200,14 +201,14 @@ EnergyLedger accepted_energy_increment(const NonlinearDynamicModel& model,const 
 // We need dt in predictor; keep it outside SolverContext private implementation.
 bool attempt_step(const NonlinearDynamicModel& model,const DynamicState& start,double ag,double dt,
                   SolverContext& ctx,const RobustNewmarkOptions& options,
-                  AnalysisStats& stats,DynamicState& out,std::string& last_error){
+                  const std::vector<double>& constant_load,AnalysisStats& stats,DynamicState& out,std::string& last_error){
     const int n=model.dof();
     std::vector<double> u_pred(static_cast<std::size_t>(n)),v_pred(static_cast<std::size_t>(n));
     for(int i=0;i<n;++i){u_pred[static_cast<std::size_t>(i)]=start.u[static_cast<std::size_t>(i)]+dt*start.v[static_cast<std::size_t>(i)]+dt*dt*(0.5-kBeta)*start.a[static_cast<std::size_t>(i)];v_pred[static_cast<std::size_t>(i)]=start.v[static_cast<std::size_t>(i)]+dt*(1.0-kGamma)*start.a[static_cast<std::size_t>(i)];}
     std::vector<double> u_trial=options.kinematic_initial_guess?u_pred:start.u;
     std::optional<Eval> cached;
     for(int iter=0;iter<options.max_iterations;++iter){
-        Eval cur=cached?std::move(*cached):evaluate(model,start,u_trial,u_pred,v_pred,ag,ctx,stats,last_error);cached.reset();++stats.newton_iterations;
+        Eval cur=cached?std::move(*cached):evaluate(model,start,u_trial,u_pred,v_pred,ag,constant_load,ctx,stats,last_error);cached.reset();++stats.newton_iterations;
         stats.last_residual_norm=cur.norm;
         stats.last_residual_tolerance=options.tolerance*(options.relative_force_tolerance?cur.scale:1.0);
         if(!std::isfinite(cur.norm)||!std::isfinite(cur.scale))return false;
@@ -223,7 +224,7 @@ bool attempt_step(const NonlinearDynamicModel& model,const DynamicState& start,d
         std::optional<Eval> best_any_eval;
         for(int bt=0;bt<=options.max_backtracks;++bt){
             std::vector<double> cand=u_trial;for(int i=0;i<n;++i)cand[static_cast<std::size_t>(i)]+=alpha*du[static_cast<std::size_t>(i)];
-            Eval ce=evaluate(model,start,cand,u_pred,v_pred,ag,ctx,stats,last_error);
+            Eval ce=evaluate(model,start,cand,u_pred,v_pred,ag,constant_load,ctx,stats,last_error);
             const bool best_candidate=std::isfinite(ce.norm)&&ce.norm<best_any;
             if(best_candidate){best_any=ce.norm;best_any_u=cand;best_any_bt=bt;}
             if(std::isfinite(ce.norm) && ce.norm<best){best=ce.norm;best_u=std::move(cand);cached=std::move(ce);accepted=true;if(bt>0)stats.line_search_backtracks+=static_cast<std::size_t>(bt);break;}
@@ -254,7 +255,18 @@ AnalysisResult run_newmark_robust_core(const NonlinearDynamicModel& model,const 
     if(options.max_iterations<1||options.max_backtracks<0||options.max_subdivisions<0||options.backtrack_ratio<=0.0||options.backtrack_ratio>=1.0||options.nonmonotone_line_search_factor<1.0)throw std::invalid_argument("invalid robust Newmark options");
     if(strategy==LinearStrategy::ModifiedNewton || strategy==LinearStrategy::Adaptive) throw std::invalid_argument("robust driver does not yet support ModifiedNewton/Adaptive");
     const int n=model.dof();
-    DynamicState state{std::vector<double>(static_cast<std::size_t>(n),0.0),std::vector<double>(static_cast<std::size_t>(n),0.0),std::vector<double>(static_cast<std::size_t>(n),0.0),model.initial_nonlinear_state(),model.initial_nonlinear_tangents()};
+    auto sized=[&](const std::vector<double>& v,std::size_t count,const char* name){if(!v.empty()&&v.size()!=count)throw std::invalid_argument(std::string(name)+" size mismatch");return v.empty()?std::vector<double>(count,0.0):v;};
+    DynamicState state{
+        sized(options.initial_displacement,static_cast<std::size_t>(n),"initial displacement"),
+        sized(options.initial_velocity,static_cast<std::size_t>(n),"initial velocity"),
+        sized(options.initial_acceleration,static_cast<std::size_t>(n),"initial acceleration"),
+        options.initial_committed_state.empty()?model.initial_nonlinear_state():options.initial_committed_state,
+        model.initial_nonlinear_tangents()};
+    if(state.committed.size()!=static_cast<std::size_t>(model.nonlinear_state_size()))throw std::invalid_argument("initial committed state size mismatch");
+    {std::vector<double> initial_force,trial_state;model.internal_force_and_tangent(state.u,state.committed,initial_force,state.tangents,trial_state);}
+    const std::vector<double> zero_load(static_cast<std::size_t>(n),0.0);
+    const auto& constant_load=options.constant_load.empty()?zero_load:options.constant_load;
+    if(constant_load.size()!=static_cast<std::size_t>(n))throw std::invalid_argument("constant load size mismatch");
     AnalysisResult result;result.roof_history.reserve(ground_accel.size());result.stats.minimum_dt=dt;
     const auto start_time=std::chrono::steady_clock::now();
     double initial_stability=0.0;
@@ -297,9 +309,9 @@ AnalysisResult run_newmark_robust_core(const NonlinearDynamicModel& model,const 
     std::function<bool(const DynamicState&,double,double,double,int,DynamicState&,EnergyLedger&,SubstepBuffer*)> advance;
     advance=[&](const DynamicState& s,double ag0,double ag1,double t0,int depth,DynamicState& out,EnergyLedger& energy,SubstepBuffer* accepted)->bool{
         const double d=dt/std::pow(2.0,depth);result.stats.minimum_dt=std::min(result.stats.minimum_dt,d);auto& ctx=get_ctx(depth);const std::size_t lat0=result.stats.nonlinear_lateral_loss;
-        if(attempt_step(model,s,ag1,d,ctx,options,result.stats,out,result.last_integration_error)){
+        if(attempt_step(model,s,ag1,d,ctx,options,constant_load,result.stats,out,result.last_integration_error)){
             if(result.stats.nonlinear_lateral_loss>lat0)current_step_lateral_seen=true;
-            energy=accepted_energy_increment(model,s,out,ag0,ag1,d);++result.stats.internal_substeps;
+            energy=accepted_energy_increment(model,s,out,ag0,ag1,d,constant_load);++result.stats.internal_substeps;
             if(accepted) accepted->push_back({depth,t0+d,ag1,out});
             return true;
         }

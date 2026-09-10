@@ -76,7 +76,8 @@ void add_scaled_bbt(std::vector<Triplet>& t, const SparseUpdateBasis& basis,
 std::array<double,36> frame2d_global_stiffness(double xi, double yi,
                                                double xj, double yj,
                                                double E, double A, double I,
-                                               double axial_compression) {
+                                               double axial_compression,
+                                               bool pdelta_transformation) {
     if (E <= 0.0 || A <= 0.0 || I <= 0.0 || axial_compression < 0.0)
         throw std::invalid_argument("invalid frame property");
     const double dx=xj-xi, dy=yj-yi;
@@ -97,7 +98,10 @@ std::array<double,36> frame2d_global_stiffness(double xi, double yi,
     set(4,1,-e12); set(4,2,-e6); set(4,4,e12); set(4,5,-e6);
     set(5,1,e6); set(5,2,e2); set(5,4,-e6); set(5,5,e4);
 
-    if (axial_compression > 0.0) {
+    if (axial_compression > 0.0 && pdelta_transformation) {
+        const double q=axial_compression/L;
+        k[7]-=q; k[10]+=q; k[25]+=q; k[28]-=q;
+    } else if (axial_compression > 0.0) {
         // Standard beam-column geometric stiffness. Compression reduces tangent.
         const double q=axial_compression/(30.0*L);
         const int map[4]{1,2,4,5};
@@ -134,10 +138,11 @@ void Frame2DBuilder::add_node(int id, double x, double y,
 
 void Frame2DBuilder::add_elastic_frame(int id, int node_i, int node_j,
                                        double E, double A, double I,
-                                       double axial_compression) {
+                                       double axial_compression,
+                                       bool pdelta_transformation) {
     if(std::any_of(elements_.begin(),elements_.end(),[&](const ElasticFrame2D& e){return e.id==id;}))
         throw std::invalid_argument("duplicate 2D elastic element id");
-    elements_.push_back({id,node_i,node_j,E,A,I,axial_compression});
+    elements_.push_back({id,node_i,node_j,E,A,I,axial_compression,pdelta_transformation});
 }
 
 void Frame2DBuilder::add_rotational_spring(int id, int node_i, int node_j,
@@ -285,7 +290,7 @@ CompiledFrame2D Frame2DBuilder::compile() const {
         const int si=slot(e.node_i), sj=slot(e.node_j);
         const auto& ni=nodes_[static_cast<std::size_t>(si)];
         const auto& nj=nodes_[static_cast<std::size_t>(sj)];
-        const auto kg=frame2d_global_stiffness(ni.x,ni.y,nj.x,nj.y,e.E,e.A,e.I,e.axial_compression);
+        const auto kg=frame2d_global_stiffness(ni.x,ni.y,nj.x,nj.y,e.E,e.A,e.I,e.axial_compression,e.pdelta_transformation);
         int fd[6]{3*si,3*si+1,3*si+2,3*sj,3*sj+1,3*sj+2};
         CompiledFrame2D::ElementResponseData rd; rd.properties=e; rd.xi=ni.x; rd.yi=ni.y; rd.xj=nj.x; rd.yj=nj.y;
         for(int d=0;d<6;++d) rd.reduced_dofs[static_cast<std::size_t>(d)]=out.full_to_reduced_[static_cast<std::size_t>(fd[d])];
@@ -551,7 +556,10 @@ ElasticFrame2DResponse CompiledFrame2D::elastic_element_response(
     std::array<double,4> qb{q[1],q[2],q[4],q[5]},fb{};
     const double kb[4][4]={{k12,k6,-k12,k6},{k6,k4,-k6,k2},{-k12,-k6,k12,-k6},{k6,k2,-k6,k4}};
     for(int i=0;i<4;++i)for(int j=0;j<4;++j)fb[static_cast<std::size_t>(i)]+=kb[i][j]*qb[static_cast<std::size_t>(j)];
-    if(p>0.0){
+    if(p>0.0 && e.properties.pdelta_transformation){
+        const double fac=p/L;
+        fb[0]-=fac*(qb[0]-qb[2]);fb[2]+=fac*(qb[0]-qb[2]);
+    }else if(p>0.0){
         const double fac=p/(30.0*L);
         const double g[4][4]={{36.0,3.0*L,-36.0,3.0*L},{3.0*L,4.0*L*L,-3.0*L,-L*L},{-36.0,-3.0*L,36.0,-3.0*L},{3.0*L,-L*L,-3.0*L,4.0*L*L}};
         for(int i=0;i<4;++i)for(int j=0;j<4;++j)fb[static_cast<std::size_t>(i)]-=fac*g[i][j]*qb[static_cast<std::size_t>(j)];

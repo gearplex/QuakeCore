@@ -198,6 +198,14 @@ struct RobustNewmarkOptions {
     double direct_rank_fraction{0.35};
     CollapseCriteria collapse{};
     bool return_numerical_failure{false};
+    // Optional equilibrated starting point and persistent static load. These
+    // vectors allow a gravity solve to transfer displacement and constitutive
+    // history into NRHA without dropping the gravity force from equilibrium.
+    std::vector<double> initial_displacement;
+    std::vector<double> initial_velocity;
+    std::vector<double> initial_acceleration;
+    std::vector<double> initial_committed_state;
+    std::vector<double> constant_load;
     // Optional callback at each accepted original output step (after any
     // internal subdivision). Intended for validation/EDP recorders without
     // forcing the production solver to retain full state histories.

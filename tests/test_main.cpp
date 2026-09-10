@@ -22,6 +22,7 @@
 #include "quake/superlu_solver.hpp"
 #include "quake/suite.hpp"
 #include "quake/ida.hpp"
+#include "quake/static_analysis.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -1699,6 +1700,22 @@ static void test_model_comparison_harness_frame3d_smoke(){
     require(r.variants[0].columns.size()==1&&!r.variants[0].columns[0].history.empty(),"3D comparison native axial/shear history");
 }
 
+static void test_gravity_state_transfer_remains_in_equilibrium(){
+    Frame2DBuilder b;b.add_node(1,0,0);b.add_node(2,0,10,1,1,0);b.fix(1);
+    b.add_elastic_frame(1,1,2,1000,10,10);b.set_response_node(2);b.set_story_nodes({2});
+    auto model=b.compile();std::vector<double> load(static_cast<std::size_t>(model.dof()),0.0);
+    const int uy=model.reduced_dof(2,Dof2D::UY);load[static_cast<std::size_t>(uy)]=-10.0;
+    auto gravity=solve_static_load(model,load,10,1e-12,10);
+    require(gravity.converged,"gravity solve convergence");
+    require(std::abs(gravity.displacement[static_cast<std::size_t>(uy)]+.01)<1e-12,"gravity axial displacement");
+    RobustNewmarkOptions o;o.constant_load=load;o.initial_displacement=gravity.displacement;
+    o.initial_committed_state=gravity.committed_state;o.collapse.check_initial_stability=false;
+    o.line_search=false;o.max_subdivisions=0;
+    auto a=run_newmark_robust(model,std::vector<double>(10,0.0),.01,LinearStrategy::SamePatternRefactorization,o);
+    require(a.termination==AnalysisTermination::Completed,"gravity-state transient completion");
+    require(std::abs(a.final_displacement[static_cast<std::size_t>(uy)]+.01)<1e-11,"gravity equilibrium retained in transient");
+}
+
 int main(){
     try{
         test_sparse_solve();
@@ -1749,6 +1766,7 @@ int main(){
         test_model_comparison_harness_is_aligned_and_order_invariant();
         test_rc_model_comparison_variant_requires_exact_binding_coverage();
         test_model_comparison_harness_frame3d_smoke();
+        test_gravity_state_transfer_remains_in_equilibrium();
         test_asce41_cyclic_path_continuity_and_persistent_E_loss();
         test_pm_interaction_return_mapping_and_consistent_tangent();
         test_perform_concrete_pm_surface_return_mapping();

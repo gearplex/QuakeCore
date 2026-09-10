@@ -1,0 +1,30 @@
+{
+  "engine_label": "QuakeCore Phase 9M candidate",
+  "date": "2026-09-10",
+  "base_commit": "9ac3f8342535e27df3f7a2c6e0a876ecce479b70",
+  "archetype": "YORi special nonbearing RC wall 10001",
+  "verification_level": "matched-law software verification and independent OpenSees numerical comparison",
+  "implemented": [
+    "nonlinear static gravity equilibration",
+    "gravity-state and committed-material-state transfer to NRHA",
+    "persistent gravity load in dynamic equilibrium",
+    "modal analysis from gravity-state tangent",
+    "optional OpenSees-compatible plane-frame member PDelta sway transformation",
+    "dense LAPACK verification fallback when SuperLU is unavailable"
+  ],
+  "tests": {"passed": 11, "total": 11},
+  "matched_gravity": {
+    "max_floor_displacement_difference_in": 5.353321952394907e-11,
+    "max_story_drift_difference": 1.9150038000660674e-13,
+    "quakecore_median_seconds": 0.189654687,
+    "opensees_median_seconds": 0.18226398700062418,
+    "quakecore_to_opensees_ratio": 1.0405494257038856
+  },
+  "open_gate": "ConcreteCM + Pinching4 + MinMax + Parallel material-level parity",
+  "not_assessed": [
+    "exact YORi collapse response",
+    "physical wall validation",
+    "FEMA P-695 CMR, SSF, ACMR, or acceptance",
+    "production sparse-solver scaling"
+  ]
+}

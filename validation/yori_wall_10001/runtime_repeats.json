@@ -1,0 +1,25 @@
+{
+  "scope": "Matched Concrete01/Steel01/bilinear-shear archetype 10001 with gravity-state transfer and leaning-column P-Delta; integration timers exclude model construction and modal analysis",
+  "repetitions": 7,
+  "quakecore_seconds": [
+    0.207656313,
+    0.191543350,
+    0.181444908,
+    0.194304858,
+    0.187601049,
+    0.189654687,
+    0.184971401
+  ],
+  "opensees_seconds": [
+    0.18226398700062418,
+    0.18152723999992304,
+    0.17713009699946270,
+    0.17493298200042773,
+    0.18524092899951938,
+    0.18477339900073275,
+    0.18459264299963252
+  ],
+  "quakecore_median_seconds": 0.189654687,
+  "opensees_median_seconds": 0.18226398700062418,
+  "quakecore_to_opensees_median_ratio": 1.0405494257038856
+}

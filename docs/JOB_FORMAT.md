@@ -20,7 +20,7 @@ Exit codes: **0** completed analysis or configured threshold reached; **2** inva
 
 ## Schema `quakecore.job.v1`
 
-Top-level fields are `schema`, `name`, `units`, `model`, `analysis`, `records`, and optional `provenance`. Unknown fields are rejected. IDs must be 32-bit integers. Units are explicit labels; the runner does **not** convert between unit systems. Use one consistent system throughout: forces, lengths, seconds, nodal masses in force·s²/length, stiffness, moments, and ground acceleration in length/s². Thus acceleration supplied in g must first be multiplied by the acceleration of gravity in the chosen units. Rotations are radians. Force and moment convergence tolerances still use the raw assembled residual norm; dimensional residual scaling remains a development item.
+Top-level fields are `schema`, `name`, `units`, `model`, `analysis`, `records`, and optional `provenance` and `gravity`. Unknown fields are rejected. IDs must be 32-bit integers. Units are explicit labels; the runner does **not** convert between unit systems. Use one consistent system throughout: forces, lengths, seconds, nodal masses in force·s²/length, stiffness, moments, and ground acceleration in length/s². Thus acceleration supplied in g must first be multiplied by the acceleration of gravity in the chosen units. Rotations are radians. Force and moment convergence tolerances still use the raw assembled residual norm; dimensional residual scaling remains a development item.
 
 `model.type` is `frame2d`. Supported arrays:
 
@@ -29,7 +29,7 @@ Top-level fields are `schema`, `name`, `units`, `model`, `analysis`, `records`, 
 | `nodes` | `[id, x, y, mass_x, mass_y, rotational_mass]` |
 | `fixities` | `[node_id, fix_ux, fix_uy, fix_rz]`, actual JSON booleans |
 | `equal_dofs` | `[retained_node, constrained_node, "UX" / "UY" / "RZ"]` |
-| `members` | `[id, node_i, node_j, E, A, I, constant_compressive_preload]` |
+| `members` | `[id, node_i, node_j, E, A, I, constant_compressive_preload, pdelta_transformation?]`; the final boolean is optional and defaults to `false` |
 | `rayleigh` | `[alpha_mass, beta_initial_stiffness]` |
 | `story_nodes` | One output node per floor, bottom to top, with increasing positive elevations |
 | `story_cut_members` | Optional arrays of upward vertical member IDs whose signed end shears form each story cut |
@@ -54,7 +54,9 @@ Full NRHA history rows report steel-member nodal force, axial force/deformation,
 
 Soil and pile definitions are detailed in [SOIL_FOUNDATIONS.md](SOIL_FOUNDATIONS.md). Translational components use `q = n dot (u_j-u_i)`; rotational components use `"dof":"RZ"` and `q = RZ_j-RZ_i`. Named p-y/t-z/q-z adapters convert explicit engineer-supplied distributed capacities to nodal force and use `k0 = 0.5 Fult/u50`; they are not OpenSees Simple1 implementations. A pile line generates a uniform vertical beam mesh and fixed coincident soil nodes from explicit ID arrays. Full output includes depth-wise displacement, soil reaction, pile shear/moment, and toe response; summary output includes peak absolute profiles.
 
-Members use the existing small-displacement formulation with optional constant-preload geometric stiffness. The preload influences the tangent but is **not** a gravity equilibrium analysis. Loads, geometric nonlinearity, material state and gravity redistribution are not interchangeable. The result explicitly reports `gravity_analysis_performed: false`. The 3D, P–M and corotational research APIs remain in C++; the JSON steel-member path exposes IMK-family rotational hinges but not axial-flexural interaction.
+Members use the existing small-displacement formulation. An optional `true` final member flag activates the OpenSees-compatible plane-frame `PDelta` sway transformation; this is not a corotational formulation. The legacy constant-compression input remains available for fixed-preload studies. The 3D, P–M and corotational research APIs remain in C++; the JSON steel-member path exposes IMK-family rotational hinges but not axial-flexural interaction.
+
+An optional top-level `gravity` object performs nonlinear static load steps before modal analysis and NRHA. It requires nonempty `provenance` and `loads`, where each load is `[node_id, fx, fy, mz]`; optional controls are positive integer `steps` and `max_iterations`, plus positive `tolerance`. The converged displacement and committed material state are transferred into the dynamic analysis, and the constant gravity load remains in the dynamic equilibrium residual. Modal properties are evaluated from the gravity-state tangent. The result reports convergence, iteration count, residual, reduced load vector, and equilibrated displacement. This is gravity equilibration/state transfer, not automatic load generation or code-prescribed P-Delta modeling; the engineer must assign loads and transformation flags deliberately.
 
 ## Analysis and records
 

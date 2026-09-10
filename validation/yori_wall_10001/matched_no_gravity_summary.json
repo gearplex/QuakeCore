@@ -1,0 +1,32 @@
+{
+  "scope": "matched constitutive laws, no gravity or P-Delta; numerical verification only",
+  "archetype": 10001,
+  "stories": 3,
+  "record": "SortedEQFile_(120111).txt",
+  "dt_seconds": 0.01,
+  "steps": 2999,
+  "scale": 0.03,
+  "opensees_version": "3.8.0",
+  "quakecore_termination": "completed",
+  "quakecore_analysis_seconds": 0.361657792,
+  "quakecore_integration_seconds": 0.218285497,
+  "quakecore_end_to_end_seconds_median": 0.5259677470003226,
+  "opensees_integration_seconds_median": 0.1625095730000794,
+  "runtime_ratio_quakecore_over_opensees_integration": 1.343216236251469,
+  "max_floor_displacement_difference_in": 0.028199785162505805,
+  "max_story_drift_difference": 0.0003202757582413367,
+  "quakecore_peak_story_drift_ratio": [
+    0.0008596300877898366,
+    0.001662640490888049,
+    0.002371352931745358
+  ],
+  "opensees_peak_story_drift_ratio": [
+    0.0008596299179888864,
+    0.0016626414089334202,
+    0.002371352172210758
+  ],
+  "opensees_periods_seconds": [
+    1.2152322985103454,
+    0.18219014700627173
+  ]
+}
