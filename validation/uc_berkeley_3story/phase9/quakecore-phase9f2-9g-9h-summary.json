@@ -1,0 +1,218 @@
+{
+  "phase": "9F2_9G_9H_SUMMARY",
+  "status": "MECHANICS_AND_DAMPING_SENSITIVITY_COMPLETE_WITH_PROXY_INPUT",
+  "mroz_vs_epp": {
+    "epp_peak_story_drift_percent": [
+      5.103843164,
+      5.69979629711,
+      2.9918869907
+    ],
+    "mroz_peak_story_drift_percent": [
+      5.08944552209,
+      5.71590186748,
+      2.98992992493
+    ],
+    "difference_percentage_points": [
+      -0.014397641909999592,
+      0.0161055703700006,
+      -0.001957065769999655
+    ],
+    "b1_plastic_rotation_epp_rad": 0.0182795927745,
+    "b1_plastic_rotation_mroz_rad": 0.0184190647984,
+    "b1_plastic_axial_epp_in": 0.169627885676,
+    "b1_plastic_axial_mroz_in": 0.171593618172
+  },
+  "damping": {
+    "current_rayleigh_peak_story_drift_percent": [
+      5.08944552209,
+      5.71590186748,
+      2.98992992493
+    ],
+    "nist_hybrid_peak_story_drift_percent": [
+      5.11519838777,
+      5.72837627746,
+      2.92228480395
+    ],
+    "difference_percentage_points": [
+      0.02575286567999946,
+      0.012474409979999379,
+      -0.06764512098000042
+    ],
+    "b1_rotation_current_rad": 0.0184190647984,
+    "b1_rotation_hybrid_rad": 0.020775346309,
+    "b1_rotation_change_fraction": 0.1279262295013306,
+    "modal_only_3pct": {
+      "termination": 2,
+      "termination_time_s": 2.45,
+      "reason": "robust Newmark failed after maximum subdivision",
+      "exact_low_rank_newton_tangent": true
+    }
+  },
+  "story2_statepath_audit_surrogate": {
+    "note": "Detailed state audit uses Phase 9F.1 EPP + current Rayleigh because Mroz and NIST-hybrid changed global peak drifts only slightly; values are diagnostic, not exact hybrid snapshots.",
+    "at_5_18s": {
+      "drift_percent": [
+        3.0230437824,
+        4.2419300954,
+        2.03710766164
+      ],
+      "story_tangent_diag_kip_per_in": [
+        52.878655787,
+        40.0751475651,
+        43.6600098124
+      ],
+      "first_tangent_mode": {
+        "floor_shape": [
+          0.315783086703,
+          0.765967532135,
+          1
+        ],
+        "interstory_components": [
+          0.315783086703,
+          0.45018444543200004,
+          0.23403246786499998
+        ],
+        "s2_over_s1": 1.425612910850438,
+        "period_s": 0.664179953899
+      },
+      "hinges_by_story": {
+        "1": {
+          "max_abs_plastic_rotation_rad": 0.0139840470208,
+          "mean_abs_plastic_rotation_rad": 0.006488391089653163,
+          "max_abs_plastic_axial_in": 0.113777404942,
+          "mean_abs_plastic_axial_in": 0.039600068664397824,
+          "min_P_kip": -6.59573383511,
+          "max_P_kip": 27.8725531406
+        },
+        "2": {
+          "max_abs_plastic_rotation_rad": 0.0121388856744,
+          "mean_abs_plastic_rotation_rad": 0.0069664203068756205,
+          "max_abs_plastic_axial_in": 0.0702429691044,
+          "mean_abs_plastic_axial_in": 0.028044679144642138,
+          "min_P_kip": -3.17802252852,
+          "max_P_kip": 17.5581314694
+        },
+        "3": {
+          "max_abs_plastic_rotation_rad": 0.00799400111226,
+          "mean_abs_plastic_rotation_rad": 0.002221632145716125,
+          "max_abs_plastic_axial_in": 0.0502047043863,
+          "mean_abs_plastic_axial_in": 0.0136337924638035,
+          "min_P_kip": 0.00391924221493,
+          "max_P_kip": 8.94265287807
+        }
+      }
+    },
+    "at_story2_peak": {
+      "time_s": 12.32,
+      "drift_percent": [
+        4.88378192503,
+        5.68834460421,
+        2.9130249234
+      ],
+      "story_tangent_diag_kip_per_in": [
+        52.6400804802,
+        39.1737118502,
+        43.7988233744
+      ],
+      "first_tangent_mode": {
+        "floor_shape": [
+          0.314710988502,
+          0.767812612707,
+          1
+        ],
+        "interstory_components": [
+          0.314710988502,
+          0.45310162420499994,
+          0.23218738729300004
+        ],
+        "s2_over_s1": 1.4397388103978468,
+        "period_s": 0.685986587977
+      },
+      "hinges_by_story": {
+        "1": {
+          "max_abs_plastic_rotation_rad": 0.0347961043842,
+          "mean_abs_plastic_rotation_rad": 0.01948396724413,
+          "max_abs_plastic_axial_in": 0.224904681393,
+          "mean_abs_plastic_axial_in": 0.09355548750051125,
+          "min_P_kip": -6.05419182963,
+          "max_P_kip": 29.5328084212
+        },
+        "2": {
+          "max_abs_plastic_rotation_rad": 0.0283028551217,
+          "mean_abs_plastic_rotation_rad": 0.01766408814837437,
+          "max_abs_plastic_axial_in": 0.181227284542,
+          "mean_abs_plastic_axial_in": 0.07955455588693713,
+          "min_P_kip": -4.25134375771,
+          "max_P_kip": 19.133421852
+        },
+        "3": {
+          "max_abs_plastic_rotation_rad": 0.0193594542227,
+          "mean_abs_plastic_rotation_rad": 0.0059528691974655,
+          "max_abs_plastic_axial_in": 0.16902619908,
+          "mean_abs_plastic_axial_in": 0.04616421238714375,
+          "min_P_kip": -1.06375539267,
+          "max_P_kip": 10.8148971715
+        }
+      }
+    },
+    "at_story1_peak": {
+      "time_s": 12.36,
+      "drift_percent": [
+        5.10325231341,
+        5.03446521018,
+        2.13797631707
+      ],
+      "story_tangent_diag_kip_per_in": [
+        60.0583443907,
+        51.5510232606,
+        51.6967570162
+      ],
+      "first_tangent_mode": {
+        "floor_shape": [
+          0.374253431303,
+          0.792903417911,
+          1
+        ],
+        "interstory_components": [
+          0.374253431303,
+          0.41864998660800007,
+          0.20709658208899995
+        ],
+        "s2_over_s1": 1.1186269826583264,
+        "period_s": 0.518912303205
+      },
+      "hinges_by_story": {
+        "1": {
+          "max_abs_plastic_rotation_rad": 0.0356868248706,
+          "mean_abs_plastic_rotation_rad": 0.02058573440298,
+          "max_abs_plastic_axial_in": 0.226748435652,
+          "mean_abs_plastic_axial_in": 0.09504918796369875,
+          "min_P_kip": 0.767050837708,
+          "max_P_kip": 23.0801793648
+        },
+        "2": {
+          "max_abs_plastic_rotation_rad": 0.0301453298395,
+          "mean_abs_plastic_rotation_rad": 0.018992200522966872,
+          "max_abs_plastic_axial_in": 0.184777919142,
+          "mean_abs_plastic_axial_in": 0.08175312463198213,
+          "min_P_kip": 0.826234289366,
+          "max_P_kip": 17.7636622501
+        },
+        "3": {
+          "max_abs_plastic_rotation_rad": 0.0198552597571,
+          "mean_abs_plastic_rotation_rad": 0.0061743575546275,
+          "max_abs_plastic_axial_in": 0.17042597024,
+          "mean_abs_plastic_axial_in": 0.04655399179376125,
+          "min_P_kip": 0.72297384572,
+          "max_P_kip": 10.3225617557
+        }
+      }
+    }
+  },
+  "interpretation": [
+    "Associated P-M interaction is the first-order change that restored Story-1 drift toward the experiment.",
+    "Mroz hardening and NIST-style modal/Rayleigh damping are second-order for global drift over the 15 s validation window.",
+    "The remaining Story-2 excess is associated with a tangent-state vertical distribution that favors Story 2 and substantial upper-story associated-flow axial plastic deformation.",
+    "The next model-fidelity gate should target the P-M surface normal / cyclic axial-flow behavior using exact Perform/ASCE parameters before introducing a non-associated QuakeCore enhancement."
+  ]
+}

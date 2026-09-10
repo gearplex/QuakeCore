@@ -1,0 +1,9 @@
+motion_steps=7000 dt=0.01 proxy_pga=1.52g
+refined calibrated panel=0 scale=1.35 T1=0.48 dof=69 hinges=42
+refined calibrated panel=1 scale=1.40694 T1=0.48 dof=81 hinges=54
+refined calibrated panel=1 scale=1.40694 T1=0.48 dof=81 hinges=54
+no_panel base=44.1945 drifts=2.69403,3.79618,1.873 residual=0.105138 roofres=0.178632
+panel_pass1 base=41.254 drifts=2.61146,4.25838,1.96085 residual=0.667712 roofres=0.806889
+panel_pm_pass2 base=40.9757 drifts=2.58738,4.44912,1.90207 residual=0.631407 roofres=0.763706
+full_same_rel=0 final_subdiv=24
+validation/uc_berkeley_3story/quakecore_refined_result.json

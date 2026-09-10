@@ -1,0 +1,65 @@
+{
+  "benchmark_id": "nist_gcr_22_917_50_uc_berkeley_3story_dt1",
+  "title": "UC Berkeley one-third-scale three-story RC frame, Dynamic Test 1",
+  "primary_reference": "NIST GCR 22-917-50, Chapter 3",
+  "analysis_reference": "Perform3D nonlinear dynamic procedure",
+  "units": {"force": "kip", "time": "s", "drift_ratio": "percent", "acceleration": "g"},
+  "model": {
+    "stories": 3,
+    "bays": 3,
+    "bay_width_in": 70.0,
+    "story_height_in": 48.0,
+    "column_section_in": [6.0, 6.0],
+    "beam_section_in": [6.0, 9.0],
+    "floor_weights_kip": [19.6, 19.6, 19.3],
+    "total_weight_kip": 58.5,
+    "concrete_fc_ksi": 3.57,
+    "base_condition": "fixed",
+    "dimensionality": "2D",
+    "p_delta": true,
+    "damping": {
+      "total_ratio": 0.03,
+      "modal_ratio": 0.025,
+      "rayleigh_ratio": 0.005
+    },
+    "perform3d_components": {
+      "columns": "P-M-M hinges at both ends; ASCE 41 properties with axial-demand iteration",
+      "beams": "lumped flexural hinges at both ends; ASCE 41 properties",
+      "joints": "nonlinear panel-zone elements; ASCE 41 properties"
+    }
+  },
+  "ground_motion": {
+    "event": "1985 Valparaiso, Chile",
+    "station": "Llolleo",
+    "component": "100",
+    "test": "Dynamic Test 1",
+    "nominal_amplitude_scale": 4.06,
+    "published_test_pga_g": 1.52,
+    "required_input_for_strict_parity": "acceleration history recorded on the shake table during Dynamic Test 1",
+    "status": "raw measured shake-table time history not yet acquired"
+  },
+  "targets": {
+    "measured": {
+      "first_mode_period_s": 0.34,
+      "peak_base_shear_kip": 29.8,
+      "peak_base_shear_over_weight": 0.51,
+      "peak_story_drift_percent": [5.18, 4.70, 2.61],
+      "residual_story1_drift_percent": 0.30,
+      "residual_roof_drift_percent": 0.24
+    },
+    "perform3d": {
+      "first_mode_period_s": 0.48,
+      "peak_base_shear_kip": 27.9,
+      "peak_base_shear_over_weight": 0.48,
+      "peak_story_drift_percent": [6.07, 3.92, 1.91],
+      "residual_story1_drift_percent": 3.0,
+      "residual_roof_drift_percent": 1.9
+    }
+  },
+  "strict_parity_blockers": [
+    "Acquire measured Dynamic Test 1 shake-table acceleration history.",
+    "Implement or otherwise reproduce the Perform3D coupled column P-M-M hinge behavior.",
+    "Implement the nonlinear beam-column panel-zone model used by the Perform3D benchmark.",
+    "Reconstruct ASCE 41 component properties and the reported two-pass axial-demand iteration without calibration to the published EDP outputs."
+  ]
+}

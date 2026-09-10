@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuakeCore Validation Dashboard — UC Berkeley 3-Story RC Frame</title>
+<style>
+  :root {
+    --bg: #071018;
+    --panel: #0c1721;
+    --panel2: #101e2a;
+    --line: #203445;
+    --text: #e8f0f6;
+    --muted: #8fa4b5;
+    --cyan: #46d6e4;
+    --cyan2: #1b8f9d;
+    --amber: #f2b84b;
+    --red: #f26a6a;
+    --green: #63d297;
+    --blue: #75a7ff;
+    --white: #f8fbfd;
+    --shadow: 0 18px 45px rgba(0,0,0,.25);
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at 8% -10%, rgba(70,214,228,.11), transparent 30%),
+      radial-gradient(circle at 92% 0%, rgba(117,167,255,.10), transparent 25%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.45;
+  }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  .app { min-height: 100vh; }
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    padding: 14px 24px;
+    background: rgba(7,16,24,.88);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .brand { display:flex; align-items:center; gap:12px; min-width:0; }
+  .brand-mark {
+    width: 36px; height:36px; border-radius:10px;
+    display:grid; place-items:center;
+    background: linear-gradient(135deg, rgba(70,214,228,.24), rgba(117,167,255,.16));
+    border:1px solid rgba(70,214,228,.35);
+    box-shadow: inset 0 0 22px rgba(70,214,228,.08);
+    font-weight:800; color:var(--cyan); letter-spacing:-1px;
+  }
+  .brand h1 { margin:0; font-size:15px; font-weight:750; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .brand small { color:var(--muted); display:block; margin-top:1px; font-size:11px; }
+  .top-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .btn {
+    background: #112332; color:var(--text); border:1px solid #2a4154;
+    padding:8px 12px; border-radius:10px; font-size:12px; font-weight:650;
+    transition:.15s ease;
+  }
+  .btn:hover { border-color:#41647e; transform:translateY(-1px); }
+  .btn.primary { background:rgba(70,214,228,.12); border-color:rgba(70,214,228,.44); color:#c9fbff; }
+  .btn:disabled { opacity:.42; cursor:not-allowed; transform:none; }
+  input[type=file] { display:none; }
+
+  .layout { display:grid; grid-template-columns: 265px minmax(0,1fr); }
+  .sidebar {
+    position: sticky; top:65px; height:calc(100vh - 65px); overflow:auto;
+    padding:18px 16px 28px 20px;
+    border-right:1px solid rgba(255,255,255,.065);
+    background:rgba(6,14,21,.58);
+  }
+  .side-section { margin-bottom:22px; }
+  .side-label { color:#6f8a9e; text-transform:uppercase; font-size:10px; letter-spacing:.13em; font-weight:800; margin:0 0 9px 7px; }
+  .nav a { display:flex; gap:9px; align-items:center; padding:9px 10px; color:#a8bac8; text-decoration:none; border-radius:10px; font-size:12px; margin:2px 0; }
+  .nav a:hover { color:var(--white); background:#0f1f2c; }
+  .dot { width:7px; height:7px; border-radius:50%; background:#365064; }
+  .nav a:hover .dot { background:var(--cyan); }
+  .status-card { background:#0d1b26; border:1px solid #203546; border-radius:14px; padding:13px; }
+  .status-row { display:flex; justify-content:space-between; gap:10px; margin:8px 0; font-size:11px; color:var(--muted); }
+  .status-row b { color:var(--text); font-weight:700; text-align:right; }
+  .badge { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 8px; font-size:10px; font-weight:750; border:1px solid; }
+  .badge.warn { color:#ffd991; border-color:rgba(242,184,75,.35); background:rgba(242,184,75,.08); }
+  .badge.good { color:#adf2ce; border-color:rgba(99,210,151,.35); background:rgba(99,210,151,.08); }
+  .badge.info { color:#b4f5fb; border-color:rgba(70,214,228,.35); background:rgba(70,214,228,.08); }
+
+  main { min-width:0; padding:26px clamp(16px,3vw,36px) 64px; max-width:1600px; width:100%; margin:0 auto; }
+  .hero { display:flex; justify-content:space-between; gap:28px; align-items:flex-end; margin-bottom:18px; }
+  .hero h2 { margin:0 0 5px; font-size: clamp(24px, 3.1vw, 42px); letter-spacing:-.035em; line-height:1.05; }
+  .hero p { margin:0; color:var(--muted); max-width:850px; font-size:13px; }
+  .hero-right { min-width:230px; text-align:right; }
+  .hero-right .ref { color:#9eb3c3; font-size:11px; }
+  .hero-right strong { display:block; margin-top:4px; font-size:12px; color:#d6e7f2; }
+
+  .toolbar {
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    padding:12px; background:#0a1721; border:1px solid #1d3344; border-radius:14px; margin:18px 0;
+  }
+  .seg { display:flex; gap:4px; background:#07131c; border:1px solid #1c3040; border-radius:11px; padding:4px; }
+  .seg button { background:transparent; color:#8197a8; border:0; padding:7px 11px; border-radius:8px; font-size:11px; font-weight:700; }
+  .seg button.active { color:#eaffff; background:#12313b; box-shadow: inset 0 0 0 1px rgba(70,214,228,.22); }
+  .seg button[data-source="quakecore"].active { background:#152640; box-shadow: inset 0 0 0 1px rgba(117,167,255,.3); }
+  .control { display:flex; align-items:center; gap:9px; color:var(--muted); font-size:11px; }
+  input[type=range] { accent-color:var(--cyan); width:130px; }
+
+  .kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:14px 0 20px; }
+  .kpi { background:linear-gradient(180deg,#0e1d29,#0a1721); border:1px solid #203648; border-radius:15px; padding:15px 16px; min-height:108px; box-shadow:var(--shadow); }
+  .kpi .label { color:#8399aa; font-size:10px; text-transform:uppercase; letter-spacing:.10em; font-weight:800; }
+  .kpi .value { margin-top:8px; font-size:27px; letter-spacing:-.04em; font-weight:760; color:var(--white); }
+  .kpi .sub { margin-top:5px; color:#71899a; font-size:10.5px; }
+  .delta { margin-left:7px; font-size:10px; font-weight:750; }
+  .delta.ok { color:var(--green); } .delta.bad { color:var(--red); } .delta.neutral { color:var(--muted); }
+
+  .grid { display:grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap:14px; }
+  .card { background:linear-gradient(180deg,#0d1a25,#09151e); border:1px solid #1e3344; border-radius:var(--radius); box-shadow:var(--shadow); min-width:0; overflow:hidden; }
+  .card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:16px 17px 10px; }
+  .card-head h3 { margin:0; font-size:13px; letter-spacing:-.01em; }
+  .card-head p { margin:4px 0 0; color:var(--muted); font-size:10.5px; max-width:660px; }
+  .card-body { padding:8px 17px 17px; }
+  .span7 { grid-column:span 7; } .span5 { grid-column:span 5; }
+  .span6 { grid-column:span 6; } .span12 { grid-column:span 12; }
+  .span4 { grid-column:span 4; } .span8 { grid-column:span 8; }
+
+  .frame-wrap { height:430px; display:grid; grid-template-columns:minmax(0,1fr) 175px; gap:12px; }
+  #frameSvg { width:100%; height:100%; background:linear-gradient(180deg,rgba(255,255,255,.015),rgba(255,255,255,0)); border-radius:12px; }
+  .legendbox { align-self:stretch; display:flex; flex-direction:column; gap:9px; border-left:1px solid #1c3040; padding-left:13px; font-size:10.5px; color:var(--muted); }
+  .legend-item { display:flex; align-items:center; gap:8px; }
+  .swatch { width:18px; height:3px; border-radius:4px; background:#748898; }
+  .swatch.cyan{background:var(--cyan)} .swatch.amber{background:var(--amber)} .swatch.blue{background:var(--blue)}
+  .mini-stat { margin-top:7px; padding:9px; background:#08131c; border:1px solid #193041; border-radius:10px; }
+  .mini-stat b { display:block; color:var(--text); font-size:13px; margin-top:2px; }
+
+  svg text { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  .axis-line { stroke:#2a4052; stroke-width:1; }
+  .grid-line { stroke:#1b2c3a; stroke-width:1; }
+  .chart-label { fill:#859aaa; font-size:11px; }
+  .chart-value { fill:#d9e8f2; font-size:11px; font-weight:700; }
+  .chart-title { fill:#d9e8f2; font-size:11px; font-weight:700; }
+  .chart-svg { width:100%; height:280px; display:block; }
+
+  .metric-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .metric-table th { text-align:left; color:#71889a; font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; padding:10px 9px; border-bottom:1px solid #1b3040; }
+  .metric-table td { padding:10px 9px; border-bottom:1px solid rgba(255,255,255,.045); color:#c9d7e0; }
+  .metric-table tr:last-child td { border-bottom:0; }
+  .metric-table td.num, .metric-table th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .error-good { color:var(--green)!important; font-weight:700; } .error-warn { color:var(--amber)!important; font-weight:700; } .error-bad { color:var(--red)!important; font-weight:700; }
+
+  .callout { border:1px solid rgba(242,184,75,.25); background:rgba(242,184,75,.055); border-radius:12px; padding:12px 13px; color:#d8c39a; font-size:10.5px; }
+  .callout strong { color:#ffdda0; }
+  .empty-state { min-height:220px; display:grid; place-items:center; text-align:center; color:#7890a1; padding:30px; border:1px dashed #284052; border-radius:12px; background:#08131b; }
+  .empty-state strong { color:#c6d7e2; display:block; margin-bottom:5px; }
+
+  .checklist { display:grid; gap:8px; }
+  .check { display:grid; grid-template-columns:24px 1fr auto; align-items:start; gap:9px; padding:10px 11px; border:1px solid #1c3141; background:#091720; border-radius:11px; }
+  .check-icon { width:20px; height:20px; display:grid; place-items:center; border-radius:50%; border:1px solid #345064; color:#8aa0b1; font-size:11px; }
+  .check .title { font-size:11px; font-weight:700; color:#d4e1e9; }
+  .check .desc { margin-top:2px; color:#73899a; font-size:9.8px; }
+  .check .state { font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; padding-top:3px; }
+  .state.blocked{color:var(--amber)} .state.ready{color:var(--green)} .state.partial{color:var(--blue)}
+
+  .schema { background:#07121a; border:1px solid #1b3040; color:#91a9ba; padding:12px; border-radius:11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:9.8px; overflow:auto; max-height:260px; white-space:pre; }
+  .footer { color:#637b8e; text-align:center; font-size:10px; padding:30px 0 4px; }
+  .toast { position:fixed; right:18px; bottom:18px; z-index:60; padding:11px 14px; border-radius:11px; color:#dcf4fb; background:#0f2834; border:1px solid #2f6375; box-shadow:var(--shadow); font-size:11px; opacity:0; transform:translateY(8px); pointer-events:none; transition:.22s; }
+  .toast.show { opacity:1; transform:none; }
+
+  @media (max-width:1100px){
+    .layout { grid-template-columns:1fr; }
+    .sidebar { display:none; }
+    .span7,.span5,.span6,.span4,.span8 { grid-column:span 12; }
+    .kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  @media (max-width:680px){
+    .topbar { padding:11px 13px; }
+    .brand small { display:none; }
+    main { padding:18px 11px 45px; }
+    .hero { display:block; }
+    .hero-right { text-align:left; margin-top:12px; min-width:0; }
+    .kpis { grid-template-columns:1fr 1fr; gap:8px; }
+    .kpi { padding:12px; min-height:96px; }
+    .kpi .value { font-size:22px; }
+    .frame-wrap { grid-template-columns:1fr; height:auto; }
+    #frameSvg { height:390px; }
+    .legendbox { border-left:0; border-top:1px solid #1c3040; padding:12px 0 0; display:grid; grid-template-columns:1fr 1fr; }
+    .top-actions .btn:not(.primary){display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">Q</div>
+      <div><h1>QuakeCore Validation</h1><small>UC Berkeley 3-story RC frame · NIST GCR 22-917-50</small></div>
+    </div>
+    <div class="top-actions">
+      <label class="btn primary" for="fileInput">Import QuakeCore JSON</label>
+      <input id="fileInput" type="file" accept="application/json,.json" />
+      <button class="btn" id="exportBtn">Export current data</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-section">
+        <div class="side-label">Dashboard</div>
+        <nav class="nav">
+          <a href="#overview"><span class="dot"></span>Overview</a>
+          <a href="#model"><span class="dot"></span>Model & drift shape</a>
+          <a href="#drifts"><span class="dot"></span>Story drifts</a>
+          <a href="#shears"><span class="dot"></span>Story shears</a>
+          <a href="#edps"><span class="dot"></span>EDP comparison</a>
+          <a href="#readiness"><span class="dot"></span>Parity readiness</a>
+          <a href="#schema"><span class="dot"></span>Result schema</a>
+        </nav>
+      </div>
+      <div class="side-section">
+        <div class="side-label">Benchmark status</div>
+        <div class="status-card">
+          <div class="badge warn">Pre-validation</div>
+          <div class="status-row"><span>Strict input motion</span><b>Missing</b></div>
+          <div class="status-row"><span>Published targets</span><b>Loaded</b></div>
+          <div class="status-row"><span>QuakeCore result</span><b id="sideQC">Not loaded</b></div>
+          <div class="status-row"><span>Stories / bays</span><b>3 / 3</b></div>
+          <div class="status-row"><span>Total weight</span><b>58.5 kip</b></div>
+        </div>
+      </div>
+      <div class="side-section">
+        <div class="side-label">Reference</div>
+        <div class="status-card" style="font-size:10px;color:#8097a8;line-height:1.55">
+          NIST GCR 22-917-50, Chapter 3.<br><br>
+          Numerical target: NIST Perform3D model.<br>
+          Physical target: UC Berkeley shake-table Dynamic Test 1.
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <section id="overview">
+        <div class="hero">
+          <div>
+            <h2>External NRHA validation dashboard</h2>
+            <p>Compare QuakeCore against the published NIST Perform3D solution and the measured shake-table response. Published targets are fixed reference values; QuakeCore data are imported separately and never used to modify the targets.</p>
+          </div>
+          <div class="hero-right">
+            <span class="badge info">Dynamic Test 1</span>
+            <div class="ref">1985 Valparaiso · Llolleo 100</div>
+            <strong>Published test PGA ≈ 1.52 g</strong>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="color:#7590a3;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:800">Display dataset</span>
+            <div class="seg" id="sourceSeg">
+              <button data-source="measured">Measured test</button>
+              <button class="active" data-source="perform3d">Perform3D</button>
+              <button data-source="quakecore" id="qcSourceBtn" disabled>QuakeCore</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <div class="control">Drift-shape exaggeration <input type="range" id="exag" min="1" max="16" value="7" step="1"><b id="exagVal">7×</b></div>
+            <label class="control"><input type="checkbox" id="overlay" checked> Overlay comparison</label>
+          </div>
+        </div>
+
+        <div class="kpis" id="kpiGrid"></div>
+      </section>
+
+      <section class="grid" id="model">
+        <article class="card span7">
+          <div class="card-head">
+            <div><h3>Structural model + peak-drift envelope</h3><p>3-story × 3-bay frame. Deformed line is assembled from peak interstory drift envelopes, so it is a visualization of demand distribution, not a simultaneous time-step shape.</p></div>
+            <span class="badge info" id="sourceBadge">Perform3D</span>
+          </div>
+          <div class="card-body">
+            <div class="frame-wrap">
+              <svg id="frameSvg" viewBox="0 0 690 430" role="img" aria-label="Three story three bay structural frame visualization"></svg>
+              <div class="legendbox">
+                <div class="legend-item"><span class="swatch"></span>Undeformed frame</div>
+                <div class="legend-item"><span class="swatch cyan"></span><span id="legendSelected">Perform3D envelope</span></div>
+                <div class="legend-item"><span class="swatch amber"></span><span id="legendOverlay">Measured envelope</span></div>
+                <div class="mini-stat"><span>Bay width</span><b>70 in</b></div>
+                <div class="mini-stat"><span>Story height</span><b>48 in</b></div>
+                <div class="mini-stat"><span>Floor weight</span><b>19.6 / 19.6 / 19.3 kip</b></div>
+                <div class="mini-stat"><span>Concrete f′c</span><b>3.57 ksi</b></div>
+                <div class="mini-stat"><span>Components</span><b>P-M-M columns · beam hinges · panel zones</b></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card span5" id="drifts">
+          <div class="card-head"><div><h3>Peak interstory drift</h3><p>Published envelope values by story, with optional QuakeCore overlay after import.</p></div></div>
+          <div class="card-body"><div style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 5px 106px;font-size:9.5px;color:#7f96a7"><span>● <b style="color:#f2b84b">Measured</b></span><span>● <b style="color:#46d6e4">Perform3D</b></span><span id="qcDriftLegend" style="display:none">● <b style="color:#75a7ff">QuakeCore</b></span></div><svg id="driftChart" class="chart-svg" viewBox="0 0 520 280"></svg>
+            <div class="callout" style="margin-top:8px"><strong>Interpretation:</strong> Perform3D reproduces the first-story-dominated mechanism but predicts a different drift distribution from the measured specimen, especially at Stories 2 and 3.</div>
+          </div>
+        </article>
+
+        <article class="card span6" id="shears">
+          <div class="card-head"><div><h3>Story shear profile</h3><p>The NIST summary tabulates peak base shear, but not a complete peak story-shear envelope in the current manifest.</p></div><span class="badge warn">Data-aware</span></div>
+          <div class="card-body" id="shearBody"></div>
+        </article>
+
+        <article class="card span6">
+          <div class="card-head"><div><h3>Residual deformation</h3><p>A particularly discriminating EDP in this benchmark because Perform3D substantially overpredicted permanent drift.</p></div></div>
+          <div class="card-body"><div style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 5px 126px;font-size:9.5px;color:#7f96a7"><span>● <b style="color:#f2b84b">Measured</b></span><span>● <b style="color:#46d6e4">Perform3D</b></span><span id="qcResidualLegend" style="display:none">● <b style="color:#75a7ff">QuakeCore</b></span></div><svg id="residualChart" class="chart-svg" viewBox="0 0 520 280"></svg></div>
+        </article>
+
+        <article class="card span12" id="edps">
+          <div class="card-head">
+            <div><h3>Engineering demand parameter comparison</h3><p>Use the target selector to evaluate QuakeCore numerical parity against Perform3D or model-to-test agreement against the experiment.</p></div>
+            <div class="seg" id="targetSeg"><button class="active" data-target="perform3d">Target: Perform3D</button><button data-target="measured">Target: measured</button></div>
+          </div>
+          <div class="card-body">
+            <div style="overflow:auto"><table class="metric-table"><thead><tr><th>EDP</th><th class="num">Measured</th><th class="num">Perform3D</th><th class="num">QuakeCore</th><th class="num">QC error vs target</th><th class="num">Initial tolerance</th></tr></thead><tbody id="edpRows"></tbody></table></div>
+          </div>
+        </article>
+
+        <article class="card span7" id="readiness">
+          <div class="card-head"><div><h3>Strict parity readiness</h3><p>These are model/input prerequisites, not post-processing preferences. A run should not be labeled apples-to-apples Perform3D parity until the blocked items are closed.</p></div></div>
+          <div class="card-body"><div class="checklist" id="checklist"></div></div>
+        </article>
+
+        <article class="card span5">
+          <div class="card-head"><div><h3>Validation hierarchy</h3><p>Separates software parity from model-form accuracy.</p></div></div>
+          <div class="card-body">
+            <svg viewBox="0 0 440 315" style="width:100%;height:auto;display:block">
+              <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#476579"/></marker></defs>
+              <g font-size="11" font-weight="700" text-anchor="middle">
+                <rect x="110" y="15" width="220" height="48" rx="12" fill="#102634" stroke="#285067"/><text x="220" y="36" fill="#dff7fa">Gate A · Model / modal parity</text><text x="220" y="52" fill="#8199aa" font-size="9" font-weight="500">T₁, mass, damping, P-Delta</text>
+                <path d="M220 64 L220 91" stroke="#476579" marker-end="url(#arrow)"/>
+                <rect x="110" y="96" width="220" height="48" rx="12" fill="#102634" stroke="#285067"/><text x="220" y="117" fill="#dff7fa">Gate B · Nonlinear parity</text><text x="220" y="133" fill="#8199aa" font-size="9" font-weight="500">Drift, shear, residual response</text>
+                <path d="M220 145 L220 172" stroke="#476579" marker-end="url(#arrow)"/>
+                <rect x="110" y="177" width="220" height="48" rx="12" fill="#102634" stroke="#285067"/><text x="220" y="198" fill="#dff7fa">Gate C · Solver invariance</text><text x="220" y="214" fill="#8199aa" font-size="9" font-weight="500">Full ≈ SamePattern ≈ Woodbury</text>
+                <path d="M220 226 L220 253" stroke="#476579" marker-end="url(#arrow)"/>
+                <rect x="110" y="258" width="220" height="48" rx="12" fill="#152333" stroke="#4a608c"/><text x="220" y="279" fill="#dce7ff">Gate D · Physical comparison</text><text x="220" y="295" fill="#8496bd" font-size="9" font-weight="500">Model-form accuracy vs shake table</text>
+              </g>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card span12" id="schema">
+          <div class="card-head"><div><h3>QuakeCore result import schema</h3><p>Minimum keys populate the published EDP dashboard. Optional arrays unlock story shear and time-history views in future runs.</p></div><label class="btn primary" for="fileInput">Load result JSON</label></div>
+          <div class="card-body">
+            <div class="grid" style="gap:12px">
+              <div class="span6"><div class="schema" id="schemaText"></div></div>
+              <div class="span6">
+                <div class="callout"><strong>No silent substitutions:</strong> the current benchmark still lacks the measured DT1 shake-table acceleration file locally. Importing a QuakeCore result does not upgrade the benchmark to “strict parity” unless the model and input-motion prerequisites are satisfied.</div>
+                <div style="margin-top:12px;color:#7890a2;font-size:10.5px">Optional result fields supported by this dashboard:</div>
+                <ul style="color:#8399aa;font-size:10.5px;line-height:1.7;padding-left:18px">
+                  <li><code>peak_story_shear_kip: [S1,S2,S3]</code></li>
+                  <li><code>peak_floor_acceleration_g: [F1,F2,Roof]</code></li>
+                  <li><code>time_s</code> plus response-history arrays</li>
+                  <li><code>solver</code>, <code>elapsed_s</code>, <code>newton_iterations</code></li>
+                  <li><code>input_motion_provenance</code> for strict-parity traceability</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+      <div class="footer">QuakeCore external validation UI · published reference targets are embedded from the repository manifest · pre-validation until strict-parity blockers are closed.</div>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const REF = {
+  model:{stories:3,bays:3,bay_width_in:70,story_height_in:48,floor_weights_kip:[19.6,19.6,19.3],total_weight_kip:58.5,concrete_fc_ksi:3.57},
+  measured:{name:'Measured test',short:'Measured',first_mode_period_s:0.34,peak_base_shear_kip:29.8,peak_base_shear_over_weight:0.51,peak_story_drift_percent:[5.18,4.70,2.61],residual_story1_drift_percent:0.30,residual_roof_drift_percent:0.24},
+  perform3d:{name:'Perform3D',short:'Perform3D',first_mode_period_s:0.48,peak_base_shear_kip:27.9,peak_base_shear_over_weight:0.48,peak_story_drift_percent:[6.07,3.92,1.91],residual_story1_drift_percent:3.0,residual_roof_drift_percent:1.9},
+  ground_motion:{event:'1985 Valparaiso, Chile',station:'Llolleo',component:'100',nominal_amplitude_scale:4.06,published_test_pga_g:1.52,status:'Measured DT1 table history not yet acquired locally'}
+};
+let quakecore = null;
+let selectedSource = 'perform3d';
+let targetSource = 'perform3d';
+let exaggeration = 7;
+let showOverlay = true;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const svgNS = 'http://www.w3.org/2000/svg';
+function el(name, attrs={}, parent=null){ const n=document.createElementNS(svgNS,name); Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v)); if(parent) parent.appendChild(n); return n; }
+function fmt(v,d=2){ return (v===null||v===undefined||Number.isNaN(+v))?'—':Number(v).toFixed(d); }
+function sourceData(src){ return src==='quakecore'?quakecore:REF[src]; }
+function displayName(src){ return src==='quakecore'?'QuakeCore':REF[src].short; }
+function otherReference(src){ return src==='measured'?'perform3d':'measured'; }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2300); }
+function relativeError(v,t){ if(v===undefined||v===null||t===0) return null; return 100*(v-t)/t; }
+function envelopeDisplacements(drifts){ let x=0; return drifts.map(d=>x += d/100*REF.model.story_height_in); }
+
+function renderKPIs(){
+  const d=sourceData(selectedSource) || REF.perform3d;
+  const roof = d.peak_story_drift_percent ? envelopeDisplacements(d.peak_story_drift_percent).at(-1) : null;
+  const target=REF[targetSource];
+  const items=[
+    ['First-mode period',fmt(d.first_mode_period_s,2)+' s', d.first_mode_period_s!=null?relativeError(d.first_mode_period_s,target.first_mode_period_s):null,'vs '+target.short],
+    ['Peak base shear',fmt(d.peak_base_shear_kip,1)+' kip', d.peak_base_shear_kip!=null?relativeError(d.peak_base_shear_kip,target.peak_base_shear_kip):null,'vs '+target.short],
+    ['Peak base shear / W',fmt(d.peak_base_shear_over_weight ?? (d.peak_base_shear_kip/REF.model.total_weight_kip),2), null,'Total W = 58.5 kip'],
+    ['Envelope-derived roof shift',roof!=null?fmt(roof,2)+' in':'—',null,'Sum of peak drift envelopes']
+  ];
+  $('#kpiGrid').innerHTML=items.map(([lab,val,err,sub])=>`<div class="kpi"><div class="label">${lab}</div><div class="value">${val}${err!=null?`<span class="delta ${Math.abs(err)<=3?'ok':Math.abs(err)<=10?'neutral':'bad'}">${err>=0?'+':''}${fmt(err,1)}%</span>`:''}</div><div class="sub">${sub}</div></div>`).join('');
+}
+
+function renderFrame(){
+  const svg=$('#frameSvg'); svg.innerHTML='';
+  const W=690,H=430, x0=95,yBase=355, bay=142, story=91;
+  // subtle grid
+  for(let i=0;i<4;i++) el('line',{x1:x0+i*bay,y1:50,x2:x0+i*bay,y2:yBase+20,stroke:'#132736','stroke-width':1},svg);
+  for(let j=0;j<4;j++) el('line',{x1:55,y1:yBase-j*story,x2:610,y2:yBase-j*story,stroke:'#132736','stroke-width':1},svg);
+  // story labels
+  for(let j=1;j<=3;j++){ const y=yBase-(j-.5)*story; const t=el('text',{x:62,y:y+4,fill:'#657e90','font-size':10,'text-anchor':'middle'},svg); t.textContent='S'+j; }
+  // base line
+  el('line',{x1:x0-24,y1:yBase+18,x2:x0+3*bay+24,y2:yBase+18,stroke:'#405667','stroke-width':3},svg);
+  // frame members
+  for(let i=0;i<4;i++) el('line',{x1:x0+i*bay,y1:yBase,x2:x0+i*bay,y2:yBase-3*story,stroke:'#718696','stroke-width':5,'stroke-linecap':'round'},svg);
+  for(let j=1;j<=3;j++) el('line',{x1:x0,y1:yBase-j*story,x2:x0+3*bay,y2:yBase-j*story,stroke:'#718696','stroke-width':6,'stroke-linecap':'round'},svg);
+  // fixed bases
+  for(let i=0;i<4;i++){ const x=x0+i*bay; el('path',{d:`M${x-11},${yBase+14} L${x+11},${yBase+14} M${x-8},${yBase+14} L${x-15},${yBase+22} M${x},${yBase+14} L${x-7},${yBase+22} M${x+8},${yBase+14} L${x+1},${yBase+22}`,stroke:'#61798a','stroke-width':1.3,fill:'none'},svg); }
+  // panel zone markers and hinge dots
+  for(let j=1;j<=3;j++) for(let i=0;i<4;i++){
+    const x=x0+i*bay,y=yBase-j*story;
+    el('rect',{x:x-7,y:y-7,width:14,height:14,rx:2,fill:'#0b1720',stroke:'#b68638','stroke-width':1.5,opacity:.9},svg);
+    if(i>0) el('circle',{cx:x-15,cy:y,r:3.2,fill:'#d39e43'},svg);
+    if(i<3) el('circle',{cx:x+15,cy:y,r:3.2,fill:'#d39e43'},svg);
+  }
+  // dimensions
+  el('line',{x1:x0,y1:404,x2:x0+bay,y2:404,stroke:'#3d5669','stroke-width':1},svg); el('line',{x1:x0,y1:399,x2:x0,y2:409,stroke:'#3d5669'},svg); el('line',{x1:x0+bay,y1:399,x2:x0+bay,y2:409,stroke:'#3d5669'},svg);
+  let tx=el('text',{x:x0+bay/2,y:420,fill:'#6f8798','font-size':9,'text-anchor':'middle'},svg);tx.textContent='70 in bay spacing';
+  // deformation layers
+  const current=sourceData(selectedSource) || REF.perform3d;
+  drawEnvelope(svg,current,selectedSource, selectedSource==='measured'?'#f2b84b':selectedSource==='quakecore'?'#75a7ff':'#46d6e4', 3.2, x0,yBase,bay,story);
+  if(showOverlay && selectedSource!=='quakecore'){
+    const o=otherReference(selectedSource); drawEnvelope(svg,REF[o],o, o==='measured'?'#f2b84b':'#46d6e4', 2.0, x0,yBase,bay,story,.62);
+  } else if(showOverlay && selectedSource==='quakecore') {
+    drawEnvelope(svg,REF.perform3d,'perform3d','#46d6e4',1.7,x0,yBase,bay,story,.58);
+    drawEnvelope(svg,REF.measured,'measured','#f2b84b',1.7,x0,yBase,bay,story,.5);
+  }
+  // demand arrow
+  el('path',{d:`M635 ${yBase-1.5*story} L635 ${yBase-1.5*story-42}`,stroke:'#567386','stroke-width':1.4,'marker-end':'url(#none)'},svg);
+  const info=el('text',{x:640,y:88,fill:'#6e8799','font-size':9,'text-anchor':'end'},svg); info.textContent='Envelope shape ×'+exaggeration;
+}
+function drawEnvelope(svg,d,src,color,width,x0,yBase,bay,story,opacity=1){
+  if(!d||!d.peak_story_drift_percent) return;
+  const disp=envelopeDisplacements(d.peak_story_drift_percent);
+  // visual scale map inches to SVG px; story height 48in => 91 px
+  const pxPerIn=story/48;
+  const coords=[{x:x0,y:yBase}];
+  disp.forEach((u,j)=>coords.push({x:x0+u*pxPerIn*exaggeration,y:yBase-(j+1)*story}));
+  const pts=coords.map(p=>`${p.x},${p.y}`).join(' ');
+  el('polyline',{points:pts,fill:'none',stroke:color,'stroke-width':width,'stroke-linejoin':'round','stroke-linecap':'round',opacity},svg);
+  // floor diaphragm lines shifted by cumulative displacement
+  for(let j=1;j<=3;j++){
+    const dx=disp[j-1]*pxPerIn*exaggeration, y=yBase-j*story;
+    el('line',{x1:x0+dx,y1:y,x2:x0+3*bay+dx,y2:y,stroke:color,'stroke-width':src==='quakecore'?2.4:1.7,opacity:opacity*.9,'stroke-dasharray':src==='measured'?'5 4':'none'},svg);
+    el('circle',{cx:x0+dx,cy:y,r:4.5,fill:color,opacity},svg);
+  }
+}
+
+function renderDriftChart(){
+  const svg=$('#driftChart'); svg.innerHTML='';
+  const data=[REF.measured,REF.perform3d]; if(quakecore?.peak_story_drift_percent) data.push({...quakecore,short:'QuakeCore'});
+  const max=Math.max(7,...data.flatMap(d=>d.peak_story_drift_percent||[])); const L=110,R=500,T=30,rowH=70;
+  for(let k=0;k<=4;k++){ const x=L+(R-L)*k/4; el('line',{x1:x,y1:18,x2:x,y2:250,class:'grid-line'},svg); const t=el('text',{x,y:270,class:'chart-label','text-anchor':'middle'},svg); t.textContent=fmt(max*k/4,1)+'%'; }
+  [3,2,1].forEach((story,idx)=>{
+    const y=T+idx*rowH; const lab=el('text',{x:8,y:y+21,class:'chart-title'},svg);lab.textContent='Story '+story;
+    const vals=data.map(d=>({name:d.short||d.name,v:d.peak_story_drift_percent[story-1]}));
+    vals.forEach((o,j)=>{ const yy=y+j*15; const w=(R-L)*o.v/max; const color=o.name==='Measured'?'#f2b84b':o.name==='Perform3D'?'#46d6e4':'#75a7ff'; el('rect',{x:L,y:yy,width:w,height:9,rx:4.5,fill:color,opacity:.9},svg); let text=el('text',{x:L+w+6,y:yy+8,class:'chart-value'},svg); text.textContent=fmt(o.v,2)+'%'; });
+  });
+}
+
+function renderResidualChart(){
+  const svg=$('#residualChart'); svg.innerHTML='';
+  const rows=[['Story 1 residual','residual_story1_drift_percent'],['Roof residual','residual_roof_drift_percent']];
+  const sets=[REF.measured,REF.perform3d]; if(quakecore) sets.push({...quakecore,short:'QuakeCore'});
+  const max=Math.max(3.4,...sets.flatMap(d=>rows.map(r=>+d[r[1]]||0))); const L=130,R=500;
+  for(let k=0;k<=4;k++){ const x=L+(R-L)*k/4; el('line',{x1:x,y1:20,x2:x,y2:232,class:'grid-line'},svg); const t=el('text',{x,y:258,class:'chart-label','text-anchor':'middle'},svg);t.textContent=fmt(max*k/4,1)+'%'; }
+  rows.forEach((r,ri)=>{ const y=48+ri*105; let lab=el('text',{x:5,y:y+20,class:'chart-title'},svg);lab.textContent=r[0]; sets.forEach((d,j)=>{ const v=+d[r[1]]||0, yy=y+j*18,w=(R-L)*v/max,color=(d.short||d.name)==='Measured'?'#f2b84b':(d.short||d.name)==='Perform3D'?'#46d6e4':'#75a7ff';el('rect',{x:L,y:yy,width:w,height:11,rx:5,fill:color},svg);let tx=el('text',{x:L+w+6,y:yy+9,class:'chart-value'},svg);tx.textContent=fmt(v,2)+'%';}); });
+}
+
+function renderShear(){
+  const b=$('#shearBody');
+  const hasQC=quakecore?.peak_story_shear_kip && quakecore.peak_story_shear_kip.length>=3;
+  if(!hasQC){
+    b.innerHTML=`<div class="empty-state"><div><strong>Full story-shear envelope not yet available</strong>Published benchmark manifest contains peak base shear only: <b style="color:#dce9f1">29.8 kip measured</b> and <b style="color:#dce9f1">27.9 kip Perform3D</b>.<br><br>Import a QuakeCore result with <code>peak_story_shear_kip</code> to populate this profile. No story-shear values are inferred from peak drift or base shear.</div></div>`;
+    return;
+  }
+  b.innerHTML='<svg id="shearChart" class="chart-svg" viewBox="0 0 520 280"></svg>';
+  const svg=$('#shearChart'), vals=quakecore.peak_story_shear_kip, max=Math.max(...vals,quakecore.peak_base_shear_kip||0)*1.12;
+  const x0=110,x1=490,y0=235,storyH=62; for(let k=0;k<=4;k++){const x=x0+(x1-x0)*k/4;el('line',{x1:x,y1:20,x2:x,y2:245,class:'grid-line'},svg);let t=el('text',{x,y:270,class:'chart-label','text-anchor':'middle'},svg);t.textContent=fmt(max*k/4,1);}
+  const pts=[]; vals.forEach((v,i)=>pts.push(`${x0+(x1-x0)*v/max},${y0-i*storyH}`)); el('polyline',{points:pts.join(' '),fill:'none',stroke:'#75a7ff','stroke-width':3},svg); vals.forEach((v,i)=>{const x=x0+(x1-x0)*v/max,y=y0-i*storyH;el('circle',{cx:x,cy:y,r:5,fill:'#75a7ff'},svg);let l=el('text',{x:5,y:y+4,class:'chart-title'},svg);l.textContent='Story '+(i+1);let t=el('text',{x:x+8,y:y-7,class:'chart-value'},svg);t.textContent=fmt(v,1)+' kip';});
+}
+
+const edpDefs=[
+  ['First-mode period','first_mode_period_s','s',1],
+  ['Peak base shear','peak_base_shear_kip','kip',2],
+  ['Story 1 peak drift','peak_story_drift_percent.0','%',3],
+  ['Story 2 peak drift','peak_story_drift_percent.1','%',3],
+  ['Story 3 peak drift','peak_story_drift_percent.2','%',3],
+  ['Story 1 residual drift','residual_story1_drift_percent','%',5],
+  ['Roof residual drift','residual_roof_drift_percent','%',5]
+];
+function getPath(obj,path){ return path.split('.').reduce((o,k)=>o?.[k],obj); }
+function tolText(name){ if(name.includes('period'))return '≤ 1%'; if(name.includes('base shear'))return '≤ 2%'; if(name.includes('peak drift'))return '≤ 3%'; return '≤ 5% or 0.1 pp'; }
+function renderEDPs(){
+  const target=REF[targetSource];
+  $('#edpRows').innerHTML=edpDefs.map(([name,path,unit,tol])=>{
+    const m=getPath(REF.measured,path), p=getPath(REF.perform3d,path), q=getPath(quakecore,path); let er=q==null?null:relativeError(q,getPath(target,path));
+    let cls=''; if(er!=null){ const a=Math.abs(er); cls=a<=tol?'error-good':a<=tol*2?'error-warn':'error-bad'; }
+    const decimals=unit==='%'?2:unit==='kip'?1:2;
+    return `<tr><td>${name}</td><td class="num">${fmt(m,decimals)} ${unit}</td><td class="num">${fmt(p,decimals)} ${unit}</td><td class="num">${q==null?'—':fmt(q,decimals)+' '+unit}</td><td class="num ${cls}">${er==null?'—':(er>=0?'+':'')+fmt(er,1)+'%'}</td><td class="num">${tolText(name.toLowerCase())}</td></tr>`;
+  }).join('');
+}
+
+function renderChecklist(){
+  const items=[
+    ['Published global targets','NIST Perform3D and measured EDP targets loaded from repository manifest.','ready'],
+    ['Measured DT1 table acceleration','Strict parity requires the acceleration recorded on the shake table, not nominal 4.06× source motion.','blocked'],
+    ['Coupled column axial-flexure hinge','Need a materially equivalent P-M / P-M-M column hinge implementation.','blocked'],
+    ['Nonlinear RC panel zones','Need equivalent joint panel-zone compliance and nonlinearity.','blocked'],
+    ['ASCE 41 axial-demand iteration','Reconstruct the reported two-pass column-property update without fitting EDPs.','blocked'],
+    ['QuakeCore result imported', quakecore?'Result JSON loaded into this dashboard.':'No actual QuakeCore benchmark result loaded yet.', quakecore?'partial':'blocked'],
+    ['Solver invariance','Full, SamePattern and Woodbury/adaptive must match response histories and EDPs before speed is reported.','partial']
+  ];
+  $('#checklist').innerHTML=items.map(([t,d,s])=>`<div class="check"><div class="check-icon">${s==='ready'?'✓':s==='partial'?'↻':'!'}</div><div><div class="title">${t}</div><div class="desc">${d}</div></div><div class="state ${s}">${s}</div></div>`).join('');
+}
+
+function renderLabels(){
+  $('#sourceBadge').textContent=displayName(selectedSource); $('#legendSelected').textContent=displayName(selectedSource)+' envelope';
+  const ov=selectedSource==='quakecore'?'Perform3D + measured':displayName(otherReference(selectedSource)); $('#legendOverlay').textContent=ov+' envelope';
+}
+function renderAll(){ renderKPIs();renderLabels();renderFrame();renderDriftChart();renderResidualChart();renderShear();renderEDPs();renderChecklist(); const a=$('#qcDriftLegend'),b=$('#qcResidualLegend'); if(a)a.style.display=quakecore?'inline':'none'; if(b)b.style.display=quakecore?'inline':'none'; }
+
+$$('#sourceSeg button').forEach(b=>b.addEventListener('click',()=>{ if(b.disabled)return; selectedSource=b.dataset.source; $$('#sourceSeg button').forEach(x=>x.classList.toggle('active',x===b)); renderAll(); }));
+$$('#targetSeg button').forEach(b=>b.addEventListener('click',()=>{targetSource=b.dataset.target; $$('#targetSeg button').forEach(x=>x.classList.toggle('active',x===b));renderKPIs();renderEDPs();}));
+$('#exag').addEventListener('input',e=>{exaggeration=+e.target.value;$('#exagVal').textContent=exaggeration+'×';renderFrame();});
+$('#overlay').addEventListener('change',e=>{showOverlay=e.target.checked;renderFrame();});
+
+function normalizeQC(raw){
+  const q={...raw};
+  if(q.peak_story_drift_percent && !Array.isArray(q.peak_story_drift_percent)) throw new Error('peak_story_drift_percent must be an array');
+  if(q.peak_base_shear_kip!=null && q.peak_base_shear_over_weight==null) q.peak_base_shear_over_weight=q.peak_base_shear_kip/REF.model.total_weight_kip;
+  return q;
+}
+$('#fileInput').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  try{ const raw=JSON.parse(await f.text()); quakecore=normalizeQC(raw); $('#qcSourceBtn').disabled=false; $('#sideQC').textContent='Loaded'; selectedSource='quakecore'; $$('#sourceSeg button').forEach(x=>x.classList.toggle('active',x.dataset.source==='quakecore')); renderAll(); toast('QuakeCore result loaded'); }
+  catch(err){ toast('Could not load JSON: '+err.message); }
+  e.target.value='';
+});
+$('#resetBtn').addEventListener('click',()=>{quakecore=null;selectedSource='perform3d';targetSource='perform3d';$('#qcSourceBtn').disabled=true;$('#sideQC').textContent='Not loaded'; $$('#sourceSeg button').forEach(x=>x.classList.toggle('active',x.dataset.source==='perform3d')); $$('#targetSeg button').forEach(x=>x.classList.toggle('active',x.dataset.target==='perform3d'));renderAll();toast('Dashboard reset');});
+$('#exportBtn').addEventListener('click',()=>{
+  const payload={benchmark_id:'nist_gcr_22_917_50_uc_berkeley_3story_dt1',reference:{measured:REF.measured,perform3d:REF.perform3d},quakecore};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='uc_berkeley_3story_validation_view.json';a.click();URL.revokeObjectURL(a.href);toast('Current data exported');
+});
+
+$('#schemaText').textContent=`{
+  "first_mode_period_s": 0.48,
+  "peak_base_shear_kip": 27.9,
+  "peak_story_drift_percent": [6.07, 3.92, 1.91],
+  "residual_story1_drift_percent": 3.0,
+  "residual_roof_drift_percent": 1.9,
+
+  "peak_story_shear_kip": [/* optional S1,S2,S3 */],
+  "peak_floor_acceleration_g": [/* optional F1,F2,Roof */],
+  "solver": "adaptive_woodbury",
+  "elapsed_s": 0.0,
+  "newton_iterations": 0,
+  "input_motion_provenance": "..."
+}`;
+renderAll();
+</script>
+</body>
+</html>

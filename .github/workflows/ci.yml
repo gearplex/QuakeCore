@@ -1,0 +1,16 @@
+name: numerical-verification
+on: [push, pull_request]
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        sanitizers: ["OFF", "ON"]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUAKE_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
+      - run: cmake --build build -j2
+      - run: ctest --test-dir build --output-on-failure
+      - name: Smoke benchmark
+        run: ./build/low_rank_bench 20 20 10 3

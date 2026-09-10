@@ -1,0 +1,87 @@
+{
+  "schema": "quakecore.job.v1",
+  "name": "Phase 9L single vertical pile with distributed p-y and t-z springs",
+  "units": {"force": "kN", "length": "m", "time": "s"},
+  "model": {
+    "type": "frame2d",
+    "nodes": [[1, 0.0, 12.0, 12.0, 0.0, 0.0]],
+    "fixities": [[1, false, false, false]],
+    "equal_dofs": [],
+    "members": [],
+    "hinges": [],
+    "pile_lines": [{
+      "id": "P1",
+      "head_node": 1,
+      "embedded_length": 8.0,
+      "segments": 4,
+      "pile_node_ids": [1, 2, 3, 4, 5],
+      "soil_node_ids": [101, 102, 103, 104, 105],
+      "member_ids": [201, 202, 203, 204],
+      "E": 30000000.0,
+      "A": 0.25,
+      "I": 0.012,
+      "constant_compression": 0.0,
+      "lateral": {
+        "spring_ids": [301, 302, 303, 304, 305],
+        "ultimate_resistance_per_length": [120.0, 150.0, 190.0, 230.0, 270.0],
+        "displacement_50": [0.012, 0.014, 0.016, 0.018, 0.020],
+        "hardening_ratio": 0.0,
+        "provenance": "Illustrative user-defined p-y bilinear backbone for Phase 9L verification; not a site-specific geotechnical model"
+      },
+      "shaft": {
+        "spring_ids": [311, 312, 313, 314, 315],
+        "ultimate_interface_stress": 35.0,
+        "pile_perimeter": 1.8,
+        "displacement_50": 0.008,
+        "hardening_ratio": 0.0,
+        "provenance": "Illustrative user-defined t-z bilinear backbone for Phase 9L verification"
+      },
+      "toe": {
+        "spring_id": 321,
+        "ultimate_bearing_stress": 2500.0,
+        "toe_area": 0.20,
+        "displacement_50": 0.010,
+        "suction_ratio": 0.0,
+        "compression_sign": -1,
+        "provenance": "Illustrative compression-only q-z bilinear approximation for Phase 9L verification"
+      },
+      "provenance": "Synthetic vertical pile mesh used only for mechanics and software verification"
+    }],
+    "soil_springs": [],
+    "soil_dashpots": [{
+      "id": 501,
+      "i": 101,
+      "j": 1,
+      "direction": [1.0, 0.0],
+      "coefficient": 8.0,
+      "alpha": 1.0,
+      "regularization_velocity": 0.0,
+      "provenance": "Synthetic local radiation dashpot for Phase 9L verification"
+    }],
+    "rayleigh": [0.0, 0.0],
+    "response_node": 1,
+    "story_nodes": [1],
+    "story_cut_members": []
+  },
+  "analysis": {
+    "type": "nrha",
+    "strategy": "woodbury",
+    "tolerance": 1e-10,
+    "relative_tolerance": false,
+    "initial_guess": "kinematic",
+    "max_iterations": 40,
+    "max_subdivisions": 5,
+    "line_search": true,
+    "history_stride": 1,
+    "output_mode": "full",
+    "drift_limit": 0.0
+  },
+  "records": [{
+    "name": "synthetic_pile_pulse",
+    "dt": 0.01,
+    "acceleration": [0.0, 2.0, 4.0, 7.0, 10.0, 13.0, 16.0, 18.0, 20.0, 18.0, 14.0, 9.0, 3.0, -4.0, -11.0, -17.0, -21.0, -23.0, -21.0, -16.0, -9.0, -1.0, 7.0, 14.0, 19.0, 21.0, 19.0, 14.0, 7.0, 0.0, -6.0, -11.0, -14.0, -15.0, -13.0, -9.0, -4.0, 0.0, 3.0, 5.0],
+    "sample_convention": "step_end",
+    "provenance": "Synthetic deterministic pulse for code verification only"
+  }],
+  "provenance": {"purpose": "Phase 9L mechanics verification; not design or code compliance"}
+}

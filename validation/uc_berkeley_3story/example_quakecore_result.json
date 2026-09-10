@@ -1,0 +1,8 @@
+{
+  "status": "template only; replace with actual QuakeCore output",
+  "first_mode_period_s": 0.48,
+  "peak_base_shear_kip": 27.9,
+  "peak_story_drift_percent": [6.07, 3.92, 1.91],
+  "residual_story1_drift_percent": 3.0,
+  "residual_roof_drift_percent": 1.9
+}

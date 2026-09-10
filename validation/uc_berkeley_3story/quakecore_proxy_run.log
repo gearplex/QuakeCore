@@ -1,0 +1,6 @@
+calibrated_scale=1.35 T1=0.48 alpha=0.654498 beta=0.000763944 dof=69 hinges=42
+motion_steps=7000 dt=0.01 proxy_pga=1.52g
+rank1 linear solve relerr=3.66542e-16
+recorded base=47.0919 kip drifts=2.6534,3.47062,1.8949 residual=0.0968748% roofres=0.139252% subdivisions=24
+solver invariance max roof diff full-same=0 full-wood=0.0517289 rel=0.0135508 wood_min_pivot=0.147209 wood_max_rank=37 wood_fallbacks=42590 wood_subdiv=22
+validation/uc_berkeley_3story/quakecore_proxy_result.json

@@ -1,0 +1,159 @@
+{
+  "phase": "9F_PERFORM_TYPE_PM_VALIDATION",
+  "status": "MECHANICS_VALIDATION_WINDOW_COMPLETE",
+  "input_status": "PRE-VALIDATION / deterministic DT1 proxy, not recorded shake-table motion",
+  "validated_window_s": 15.0,
+  "important_scope_note": "The 15 s window contains the dominant Phase-9F PM drift peaks at about 12.3 s. Continuation beyond ~15 s becomes computationally expensive because the associative RC P-M hinge accumulates axial plastic deformation and triggers heavy global subdivision. No claim is made that the 15 s envelope is the final full-record envelope.",
+  "mechanics": {
+    "formulation": "zero-length two-generalized-force P-M hinge",
+    "plastic_flow": "associated / normal to P-M surface",
+    "surface": "PERFORM concrete-type smooth P-M surface",
+    "surface_equation": "|(P-PB)/(PY0-PB)|^alpha + |M/MYB|^beta = 1",
+    "surface_evolution": "elastic-perfectly-plastic mechanics isolation",
+    "mroz_hardening": false,
+    "post_capping_strength_loss": false,
+    "axial_hinge_penalty": "30x physical member EA/L; penalty excluded from Rayleigh damping reference stiffness",
+    "surface_fit_provenance": "fit only to transparent Whitney-block + EPP-steel section mechanics; no dynamic EDP fitting",
+    "surface_fits": {
+      "nonductile_A_B": {
+        "bar_area_each_in2": 0.049,
+        "fy_ksi": 70.0,
+        "P_YT_kip": -27.44,
+        "P_B_kip": 45.0472166667,
+        "M_YB_kip_in": 125.598759253,
+        "P_YC_kip": 136.682,
+        "alpha_tension": 1.504,
+        "alpha_compression": 1.711,
+        "beta": 1.1,
+        "fit_rmse_tension_kip_in": 1.7781,
+        "fit_rmse_compression_kip_in": 2.694
+      },
+      "ductile_C_D": {
+        "bar_area_each_in2": 0.11,
+        "fy_ksi": 64.0,
+        "P_YT_kip": -56.32,
+        "P_B_kip": 47.2249333333,
+        "M_YB_kip_in": 177.486110533,
+        "P_YC_kip": 165.562,
+        "alpha_tension": 1.524,
+        "alpha_compression": 1.386,
+        "beta": 1.1,
+        "fit_rmse_tension_kip_in": 3.7713,
+        "fit_rmse_compression_kip_in": 2.9807
+      }
+    }
+  },
+  "damping_frozen_for_phase9f": {
+    "model": "Rayleigh using physical damping-reference stiffness",
+    "alpha_m": 0.654498469498,
+    "beta_k": 0.000763943726841,
+    "modal_damping_ratios_for_periods": [
+      {
+        "period_s": 0.48,
+        "zeta": 0.030000000000004187
+      },
+      {
+        "period_s": 0.154058811396,
+        "zeta": 0.023602362716809298
+      },
+      {
+        "period_s": 0.0928162491859,
+        "zeta": 0.030691720981345625
+      }
+    ],
+    "note": "Damping intentionally held fixed during the P-M mechanics experiment."
+  },
+  "reference_story_drift_percent": {
+    "quakecore_research": [
+      3.27759621001,
+      4.24822427323,
+      2.17607373399
+    ],
+    "perform3d_published": [
+      6.07,
+      3.92,
+      1.91
+    ],
+    "measured": [
+      5.18,
+      4.7,
+      2.61
+    ]
+  },
+  "phase9f_15s_result": {
+    "termination": 0,
+    "termination_reason": "completed",
+    "peak_story_drift_percent": [
+      5.103843164,
+      5.69979629711,
+      2.9918869907
+    ],
+    "time_at_peak_story_drift_s": [
+      12.365,
+      12.315,
+      12.305
+    ],
+    "simultaneous_at_s2_peak_percent": [
+      4.85315169048,
+      5.69979629711,
+      2.95624981173
+    ],
+    "b1_bottom_max_abs_total_rotation_rad": 0.0183799477054,
+    "b1_bottom_max_abs_plastic_rotation_rad": 0.0182795927745,
+    "b1_bottom_max_abs_plastic_axial_in": 0.169627885676,
+    "b1_bottom_time_at_max_plastic_rotation_s": 12.365,
+    "b1_bottom_P_at_max_plastic_rotation_kip": 22.8246097479,
+    "b1_bottom_M_at_max_plastic_rotation_kip_in": 106.150314722,
+    "s2_peak_interstory_tangent_diagonal_kip_per_in": [
+      52.6214923731,
+      39.1629747417,
+      43.7980005265
+    ],
+    "max_column_compression_kip": [
+      23.5642088693,
+      27.3246747379,
+      22.6058843036,
+      31.037778465,
+      14.6608384735,
+      19.7389291288,
+      14.3212905132,
+      19.6023459866,
+      5.87343625686,
+      11.1880274797,
+      6.8752696538,
+      8.49903679414
+    ]
+  },
+  "derived_comparisons": {
+    "S1_over_S2": {
+      "quakecore_research": 0.7715214638416408,
+      "phase9f_perform_type_pm": 0.8954430821655557,
+      "perform3d_published": 1.5484693877551021,
+      "measured": 1.102127659574468
+    },
+    "phase9f_error_vs_measured_fraction": [
+      -0.014702091891891894,
+      0.2127226164063829,
+      0.1463168546743295
+    ],
+    "phase9f_error_vs_perform_fraction": [
+      -0.15916916573311377,
+      0.454029667630102,
+      0.5664329794240838
+    ]
+  },
+  "numerical_gate": {
+    "max_subdivision_6": "completed through 15 s",
+    "max_subdivision_3_diagnostic": {
+      "termination_time_s": 3.59,
+      "reason": "robust Newmark failed after maximum subdivision",
+      "interpretation": "The response is numerically demanding under associated P-M flow; the lower-subdivision failure occurs much earlier and is not a physical-collapse classification."
+    }
+  },
+  "next_required_mechanics": [
+    "Perform-style trilinear/Mroz translating-surface hardening",
+    "full-record continuation robustness",
+    "then modal-vs-Rayleigh damping sensitivity with P-M mechanics frozen",
+    "exact recorded DT1 input when recovered"
+  ]
+}

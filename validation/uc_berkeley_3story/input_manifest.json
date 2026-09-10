@@ -1,0 +1,25 @@
+{
+  "schema": "quakecore.validation_input.v1",
+  "case": "UC Berkeley three-story frame / NIST GCR 22-917-50 Chapter 3",
+  "motion_file": "proxy_dt1_motion.csv",
+  "motion_kind": "synthetic_proxy",
+  "sha256": "d0a01ac7694a708f232b6ee03c0b090e2849468243cd65b1f0ee657db02e8413",
+  "source": "supplied QuakeCore Phase 9F2/9G/9H archive; deterministic proxy generated during earlier development",
+  "record_label": "proxy_DT1_not_recorded_DT1",
+  "sample_units": "g",
+  "applied_scale": 1.0,
+  "initial_state_convention": "u=v=a=0; omit t=0 acceleration to preserve archived proxy convention",
+  "experimental_validation_status": "blocked_missing_recorded_table_motion_and_reference_histories",
+  "missing_reference_artifacts": [
+    "recorded DT1 table acceleration with units, orientation, time scaling, source and processing history",
+    "measured floor displacement/acceleration and critical column histories with channel locations",
+    "Perform-3D model/property export, damping definition, gravity state and response histories",
+    "traceable current-edition parameter/acceptance rules for an ASCE 41-23 assessment"
+  ],
+  "reference_target_source": "reference_targets.json and supplied phase handoff; these aggregate targets do not verify the input waveform",
+  "primary_sources": [
+    "https://nvlpubs.nist.gov/nistpubs/gcr/2022/NIST.GCR.22-917-50.pdf",
+    "https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=933227",
+    "https://peer.berkeley.edu/shake-table-tests-nonductile-concrete-frame"
+  ]
+}

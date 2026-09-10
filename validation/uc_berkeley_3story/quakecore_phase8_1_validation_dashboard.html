@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuakeCore Validation Results — UC Berkeley 3-Story RC Frame</title>
+<style>
+  :root {
+    --bg: #071018;
+    --panel: #0c1721;
+    --panel2: #101e2a;
+    --line: #203445;
+    --text: #e8f0f6;
+    --muted: #8fa4b5;
+    --cyan: #46d6e4;
+    --cyan2: #1b8f9d;
+    --amber: #f2b84b;
+    --red: #f26a6a;
+    --green: #63d297;
+    --blue: #75a7ff;
+    --white: #f8fbfd;
+    --shadow: 0 18px 45px rgba(0,0,0,.25);
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at 8% -10%, rgba(70,214,228,.11), transparent 30%),
+      radial-gradient(circle at 92% 0%, rgba(117,167,255,.10), transparent 25%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.45;
+  }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  .app { min-height: 100vh; }
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    padding: 14px 24px;
+    background: rgba(7,16,24,.88);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .brand { display:flex; align-items:center; gap:12px; min-width:0; }
+  .brand-mark {
+    width: 36px; height:36px; border-radius:10px;
+    display:grid; place-items:center;
+    background: linear-gradient(135deg, rgba(70,214,228,.24), rgba(117,167,255,.16));
+    border:1px solid rgba(70,214,228,.35);
+    box-shadow: inset 0 0 22px rgba(70,214,228,.08);
+    font-weight:800; color:var(--cyan); letter-spacing:-1px;
+  }
+  .brand h1 { margin:0; font-size:15px; font-weight:750; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .brand small { color:var(--muted); display:block; margin-top:1px; font-size:11px; }
+  .top-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .btn {
+    background: #112332; color:var(--text); border:1px solid #2a4154;
+    padding:8px 12px; border-radius:10px; font-size:12px; font-weight:650;
+    transition:.15s ease;
+  }
+  .btn:hover { border-color:#41647e; transform:translateY(-1px); }
+  .btn.primary { background:rgba(70,214,228,.12); border-color:rgba(70,214,228,.44); color:#c9fbff; }
+  .btn:disabled { opacity:.42; cursor:not-allowed; transform:none; }
+  input[type=file] { display:none; }
+
+  .layout { display:grid; grid-template-columns: 265px minmax(0,1fr); }
+  .sidebar {
+    position: sticky; top:65px; height:calc(100vh - 65px); overflow:auto;
+    padding:18px 16px 28px 20px;
+    border-right:1px solid rgba(255,255,255,.065);
+    background:rgba(6,14,21,.58);
+  }
+  .side-section { margin-bottom:22px; }
+  .side-label { color:#6f8a9e; text-transform:uppercase; font-size:10px; letter-spacing:.13em; font-weight:800; margin:0 0 9px 7px; }
+  .nav a { display:flex; gap:9px; align-items:center; padding:9px 10px; color:#a8bac8; text-decoration:none; border-radius:10px; font-size:12px; margin:2px 0; }
+  .nav a:hover { color:var(--white); background:#0f1f2c; }
+  .dot { width:7px; height:7px; border-radius:50%; background:#365064; }
+  .nav a:hover .dot { background:var(--cyan); }
+  .status-card { background:#0d1b26; border:1px solid #203546; border-radius:14px; padding:13px; }
+  .status-row { display:flex; justify-content:space-between; gap:10px; margin:8px 0; font-size:11px; color:var(--muted); }
+  .status-row b { color:var(--text); font-weight:700; text-align:right; }
+  .badge { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 8px; font-size:10px; font-weight:750; border:1px solid; }
+  .badge.warn { color:#ffd991; border-color:rgba(242,184,75,.35); background:rgba(242,184,75,.08); }
+  .badge.good { color:#adf2ce; border-color:rgba(99,210,151,.35); background:rgba(99,210,151,.08); }
+  .badge.info { color:#b4f5fb; border-color:rgba(70,214,228,.35); background:rgba(70,214,228,.08); }
+
+  main { min-width:0; padding:26px clamp(16px,3vw,36px) 64px; max-width:1600px; width:100%; margin:0 auto; }
+  .hero { display:flex; justify-content:space-between; gap:28px; align-items:flex-end; margin-bottom:18px; }
+  .hero h2 { margin:0 0 5px; font-size: clamp(24px, 3.1vw, 42px); letter-spacing:-.035em; line-height:1.05; }
+  .hero p { margin:0; color:var(--muted); max-width:850px; font-size:13px; }
+  .hero-right { min-width:230px; text-align:right; }
+  .hero-right .ref { color:#9eb3c3; font-size:11px; }
+  .hero-right strong { display:block; margin-top:4px; font-size:12px; color:#d6e7f2; }
+
+  .toolbar {
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    padding:12px; background:#0a1721; border:1px solid #1d3344; border-radius:14px; margin:18px 0;
+  }
+  .seg { display:flex; gap:4px; background:#07131c; border:1px solid #1c3040; border-radius:11px; padding:4px; }
+  .seg button { background:transparent; color:#8197a8; border:0; padding:7px 11px; border-radius:8px; font-size:11px; font-weight:700; }
+  .seg button.active { color:#eaffff; background:#12313b; box-shadow: inset 0 0 0 1px rgba(70,214,228,.22); }
+  .seg button[data-source="quakecore"].active { background:#152640; box-shadow: inset 0 0 0 1px rgba(117,167,255,.3); }
+  .control { display:flex; align-items:center; gap:9px; color:var(--muted); font-size:11px; }
+  input[type=range] { accent-color:var(--cyan); width:130px; }
+
+  .kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:14px 0 20px; }
+  .kpi { background:linear-gradient(180deg,#0e1d29,#0a1721); border:1px solid #203648; border-radius:15px; padding:15px 16px; min-height:108px; box-shadow:var(--shadow); }
+  .kpi .label { color:#8399aa; font-size:10px; text-transform:uppercase; letter-spacing:.10em; font-weight:800; }
+  .kpi .value { margin-top:8px; font-size:27px; letter-spacing:-.04em; font-weight:760; color:var(--white); }
+  .kpi .sub { margin-top:5px; color:#71899a; font-size:10.5px; }
+  .delta { margin-left:7px; font-size:10px; font-weight:750; }
+  .delta.ok { color:var(--green); } .delta.bad { color:var(--red); } .delta.neutral { color:var(--muted); }
+
+  .grid { display:grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap:14px; }
+  .card { background:linear-gradient(180deg,#0d1a25,#09151e); border:1px solid #1e3344; border-radius:var(--radius); box-shadow:var(--shadow); min-width:0; overflow:hidden; }
+  .card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:16px 17px 10px; }
+  .card-head h3 { margin:0; font-size:13px; letter-spacing:-.01em; }
+  .card-head p { margin:4px 0 0; color:var(--muted); font-size:10.5px; max-width:660px; }
+  .card-body { padding:8px 17px 17px; }
+  .span7 { grid-column:span 7; } .span5 { grid-column:span 5; }
+  .span6 { grid-column:span 6; } .span12 { grid-column:span 12; }
+  .span4 { grid-column:span 4; } .span8 { grid-column:span 8; }
+
+  .frame-wrap { height:430px; display:grid; grid-template-columns:minmax(0,1fr) 175px; gap:12px; }
+  #frameSvg { width:100%; height:100%; background:linear-gradient(180deg,rgba(255,255,255,.015),rgba(255,255,255,0)); border-radius:12px; }
+  .legendbox { align-self:stretch; display:flex; flex-direction:column; gap:9px; border-left:1px solid #1c3040; padding-left:13px; font-size:10.5px; color:var(--muted); }
+  .legend-item { display:flex; align-items:center; gap:8px; }
+  .swatch { width:18px; height:3px; border-radius:4px; background:#748898; }
+  .swatch.cyan{background:var(--cyan)} .swatch.amber{background:var(--amber)} .swatch.blue{background:var(--blue)}
+  .mini-stat { margin-top:7px; padding:9px; background:#08131c; border:1px solid #193041; border-radius:10px; }
+  .mini-stat b { display:block; color:var(--text); font-size:13px; margin-top:2px; }
+
+  svg text { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  .axis-line { stroke:#2a4052; stroke-width:1; }
+  .grid-line { stroke:#1b2c3a; stroke-width:1; }
+  .chart-label { fill:#859aaa; font-size:11px; }
+  .chart-value { fill:#d9e8f2; font-size:11px; font-weight:700; }
+  .chart-title { fill:#d9e8f2; font-size:11px; font-weight:700; }
+  .chart-svg { width:100%; height:280px; display:block; }
+
+  .metric-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .metric-table th { text-align:left; color:#71889a; font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; padding:10px 9px; border-bottom:1px solid #1b3040; }
+  .metric-table td { padding:10px 9px; border-bottom:1px solid rgba(255,255,255,.045); color:#c9d7e0; }
+  .metric-table tr:last-child td { border-bottom:0; }
+  .metric-table td.num, .metric-table th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .error-good { color:var(--green)!important; font-weight:700; } .error-warn { color:var(--amber)!important; font-weight:700; } .error-bad { color:var(--red)!important; font-weight:700; }
+
+  .callout { border:1px solid rgba(242,184,75,.25); background:rgba(242,184,75,.055); border-radius:12px; padding:12px 13px; color:#d8c39a; font-size:10.5px; }
+  .callout strong { color:#ffdda0; }
+  .empty-state { min-height:220px; display:grid; place-items:center; text-align:center; color:#7890a1; padding:30px; border:1px dashed #284052; border-radius:12px; background:#08131b; }
+  .empty-state strong { color:#c6d7e2; display:block; margin-bottom:5px; }
+
+  .checklist { display:grid; gap:8px; }
+  .check { display:grid; grid-template-columns:24px 1fr auto; align-items:start; gap:9px; padding:10px 11px; border:1px solid #1c3141; background:#091720; border-radius:11px; }
+  .check-icon { width:20px; height:20px; display:grid; place-items:center; border-radius:50%; border:1px solid #345064; color:#8aa0b1; font-size:11px; }
+  .check .title { font-size:11px; font-weight:700; color:#d4e1e9; }
+  .check .desc { margin-top:2px; color:#73899a; font-size:9.8px; }
+  .check .state { font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; padding-top:3px; }
+  .state.blocked{color:var(--amber)} .state.ready{color:var(--green)} .state.partial{color:var(--blue)}
+
+  .schema { background:#07121a; border:1px solid #1b3040; color:#91a9ba; padding:12px; border-radius:11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:9.8px; overflow:auto; max-height:260px; white-space:pre; }
+  .footer { color:#637b8e; text-align:center; font-size:10px; padding:30px 0 4px; }
+  .toast { position:fixed; right:18px; bottom:18px; z-index:60; padding:11px 14px; border-radius:11px; color:#dcf4fb; background:#0f2834; border:1px solid #2f6375; box-shadow:var(--shadow); font-size:11px; opacity:0; transform:translateY(8px); pointer-events:none; transition:.22s; }
+  .toast.show { opacity:1; transform:none; }
+
+  @media (max-width:1100px){
+    .layout { grid-template-columns:1fr; }
+    .sidebar { display:none; }
+    .span7,.span5,.span6,.span4,.span8 { grid-column:span 12; }
+    .kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  @media (max-width:680px){
+    .topbar { padding:11px 13px; }
+    .brand small { display:none; }
+    main { padding:18px 11px 45px; }
+    .hero { display:block; }
+    .hero-right { text-align:left; margin-top:12px; min-width:0; }
+    .kpis { grid-template-columns:1fr 1fr; gap:8px; }
+    .kpi { padding:12px; min-height:96px; }
+    .kpi .value { font-size:22px; }
+    .frame-wrap { grid-template-columns:1fr; height:auto; }
+    #frameSvg { height:390px; }
+    .legendbox { border-left:0; border-top:1px solid #1c3040; padding:12px 0 0; display:grid; grid-template-columns:1fr 1fr; }
+    .top-actions .btn:not(.primary){display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">Q</div>
+      <div><h1>QuakeCore Validation</h1><small>UC Berkeley 3-story RC frame · NIST GCR 22-917-50</small></div>
+    </div>
+    <div class="top-actions">
+      <label class="btn primary" for="fileInput">Import QuakeCore JSON</label>
+      <input id="fileInput" type="file" accept="application/json,.json" />
+      <button class="btn" id="exportBtn">Export current data</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-section">
+        <div class="side-label">Dashboard</div>
+        <nav class="nav">
+          <a href="#overview"><span class="dot"></span>Overview</a>
+          <a href="#model"><span class="dot"></span>Model & drift shape</a>
+          <a href="#drifts"><span class="dot"></span>Story drifts</a>
+          <a href="#shears"><span class="dot"></span>Story shears</a>
+          <a href="#accelerations"><span class="dot"></span>Floor accelerations</a>
+          <a href="#histories"><span class="dot"></span>Response histories</a>
+          <a href="#solver"><span class="dot"></span>Solver & provenance</a>
+          <a href="#edps"><span class="dot"></span>EDP comparison</a>
+          <a href="#readiness"><span class="dot"></span>Parity readiness</a>
+          <a href="#schema"><span class="dot"></span>Result schema</a>
+        </nav>
+      </div>
+      <div class="side-section">
+        <div class="side-label">Benchmark status</div>
+        <div class="status-card">
+          <div class="badge warn">Phase 8.1 RC1 · mechanism-corrected proxy pre-validation</div>
+          <div class="status-row"><span>Strict input motion</span><b>Missing</b></div>
+          <div class="status-row"><span>Published targets</span><b>Loaded</b></div>
+          <div class="status-row"><span>QuakeCore result</span><b id="sideQC">Phase 8.1 RC1 loaded</b></div>
+          <div class="status-row"><span>Stories / bays</span><b>3 / 3</b></div>
+          <div class="status-row"><span>Total weight</span><b>58.5 kip</b></div>
+        </div>
+      </div>
+      <div class="side-section">
+        <div class="side-label">Reference</div>
+        <div class="status-card" style="font-size:10px;color:#8097a8;line-height:1.55">
+          NIST GCR 22-917-50, Chapter 3.<br><br>
+          Numerical target: NIST Perform3D model.<br>
+          Physical target: UC Berkeley shake-table Dynamic Test 1.
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <section id="overview">
+        <div class="hero">
+          <div>
+            <h2>External NRHA validation dashboard</h2>
+            <p>QuakeCore Phase 8.1 RC1 is embedded below. Phase 8.1 separates physical first-story restoring shear from inertial reaction, corrects post-yield hardening so it is independent of the 100× zero-length hinge penalty stiffness, and adds a displacement-controlled mechanism pushover. The pushover peaks at about 23.6 kip versus the NIST/FEMA P-2018 23.3-kip yield strength. Dynamic comparison remains pre-validation because the recorded DT1 table motion is not yet available.</p>
+          </div>
+          <div class="hero-right">
+            <span class="badge warn">QuakeCore refined run</span>
+            <div class="ref">1985 Valparaiso · Llolleo 100</div>
+            <strong>Published test PGA ≈ 1.52 g</strong>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="color:#7590a3;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:800">Display dataset</span>
+            <div class="seg" id="sourceSeg">
+              <button data-source="measured">Measured test</button>
+              <button data-source="perform3d">Perform3D</button>
+              <button class="active" data-source="quakecore" id="qcSourceBtn">QuakeCore</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <div class="control">Drift-shape exaggeration <input type="range" id="exag" min="1" max="16" value="7" step="1"><b id="exagVal">7×</b></div>
+            <label class="control"><input type="checkbox" id="overlay" checked> Overlay comparison</label>
+          </div>
+        </div>
+
+        <div class="callout" style="margin:0 0 14px"><strong>Interpretation boundary:</strong> this dashboard contains a real refined QuakeCore nonlinear run, but it is <b>not yet an apples-to-apples DT1 validation</b>. The input is still a deterministic 1.52 g proxy motion. Phase 8.1 uses 39-in clear columns with rigid offsets, equilibrium-consistent initial-stress P-Delta, separate localized FSC shear springs, and physical post-yield hardening. The experimental moving-P hinge wrapper remains disabled pending a proper return-mapping formulation. The published Perform3D comparison intentionally starts from a virgin numerical state.</div>
+
+        <div class="kpis" id="kpiGrid"></div>
+      </section>
+
+      <section class="grid" id="progression">
+        <article class="card span12">
+          <div class="card-head"><div><h3>Model-refinement progression</h3><p>The static mechanism and dynamic response use the same Phase 8.1 component properties. T₁ remains calibrated to 0.48 s; nonlinear strengths and EDPs are not fitted.</p></div><span class="badge info">Diagnostic progression</span></div>
+          <div class="card-body">
+            <div style="overflow:auto"><table class="metric-table"><thead><tr><th>Model state</th><th class="num">Restoring shear</th><th class="num">S1 drift</th><th class="num">S2 drift</th><th class="num">S3 drift</th><th class="num">Roof residual</th></tr></thead><tbody id="progressionRows"></tbody></table></div>
+            <div class="callout" style="margin-top:10px"><strong>Current diagnosis:</strong> Phase 8.1 no longer indicates an excessive global plastic strength. The static pushover peaks at 23.56 kip versus NIST/FEMA P-2018 Vy = 23.3 kip, and the proxy NRHA component-recovered first-story shear peaks at 28.80 kip versus 27.9 kip Perform3D and 29.8 kip measured. The remaining mismatch is primarily in drift distribution, cyclic degradation/history, and the unresolved recorded DT1 input rather than gross mechanism strength.</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="grid" id="model">
+        <article class="card span7">
+          <div class="card-head">
+            <div><h3>Structural model + peak-drift envelope</h3><p>3-story × 3-bay frame. Deformed line is assembled from peak interstory drift envelopes, so it is a visualization of demand distribution, not a simultaneous time-step shape.</p></div>
+            <span class="badge info" id="sourceBadge">Perform3D</span>
+          </div>
+          <div class="card-body">
+            <div class="frame-wrap">
+              <svg id="frameSvg" viewBox="0 0 690 430" role="img" aria-label="Three story three bay structural frame visualization"></svg>
+              <div class="legendbox">
+                <div class="legend-item"><span class="swatch"></span>Undeformed frame</div>
+                <div class="legend-item"><span class="swatch cyan"></span><span id="legendSelected">Perform3D envelope</span></div>
+                <div class="legend-item"><span class="swatch amber"></span><span id="legendOverlay">Measured envelope</span></div>
+                <div class="mini-stat"><span>Bay width</span><b>70 in</b></div>
+                <div class="mini-stat"><span>Story height</span><b>48 in</b></div>
+                <div class="mini-stat"><span>Floor weight</span><b>19.6 / 19.6 / 19.3 kip</b></div>
+                <div class="mini-stat"><span>Concrete f′c</span><b>3.57 ksi</b></div>
+                <div class="mini-stat"><span>NIST reference components</span><b>P-M-M columns · beam hinges · panel zones</b></div>
+                <div class="mini-stat"><span>Current QuakeCore refined model</span><b>39-in clear columns · localized FSC shear · physical hardening · initial-stress P-Delta</b></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card span5" id="drifts">
+          <div class="card-head"><div><h3>Peak interstory drift</h3><p>Published envelope values by story, with optional QuakeCore overlay after import.</p></div></div>
+          <div class="card-body"><div style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 5px 106px;font-size:9.5px;color:#7f96a7"><span>● <b style="color:#f2b84b">Measured</b></span><span>● <b style="color:#46d6e4">Perform3D</b></span><span id="qcDriftLegend" style="display:none">● <b style="color:#75a7ff">QuakeCore</b></span></div><svg id="driftChart" class="chart-svg" viewBox="0 0 520 280"></svg>
+            <div class="callout" style="margin-top:8px"><strong>Interpretation:</strong> Perform3D reproduces the first-story-dominated mechanism but predicts a different drift distribution from the measured specimen, especially at Stories 2 and 3.</div>
+          </div>
+        </article>
+
+        <article class="card span6" id="shears">
+          <div class="card-head"><div><h3>Inertial story-reaction profile</h3><p>This is shown separately from the mechanism-comparable first-story column restoring shear.</p></div><span class="badge warn">Data-aware</span></div>
+          <div class="card-body" id="shearBody"></div>
+        </article>
+
+        <article class="card span6">
+          <div class="card-head"><div><h3>Residual deformation</h3><p>A particularly discriminating EDP in this benchmark because Perform3D substantially overpredicted permanent drift.</p></div></div>
+          <div class="card-body"><div style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 5px 126px;font-size:9.5px;color:#7f96a7"><span>● <b style="color:#f2b84b">Measured</b></span><span>● <b style="color:#46d6e4">Perform3D</b></span><span id="qcResidualLegend" style="display:none">● <b style="color:#75a7ff">QuakeCore</b></span></div><svg id="residualChart" class="chart-svg" viewBox="0 0 520 280"></svg></div>
+        </article>
+
+        <article class="card span6" id="accelerations">
+          <div class="card-head"><div><h3>Peak floor acceleration</h3><p>QuakeCore refined proxy-input absolute floor acceleration envelope. Published numerical values are not fabricated when the NIST manifest does not tabulate them.</p></div><span class="badge warn">Proxy input</span></div>
+          <div class="card-body"><svg id="accelChart" class="chart-svg" viewBox="0 0 520 280"></svg></div>
+        </article>
+
+        <article class="card span6" id="solver">
+          <div class="card-head"><div><h3>Run provenance + solver gate</h3><p>Separates numerical reproducibility from model/input parity.</p></div><span class="badge info">QuakeCore</span></div>
+          <div class="card-body" id="runSummary"></div>
+        </article>
+
+        <article class="card span12" id="histories">
+          <div class="card-head"><div><h3>QuakeCore response histories</h3><p>Decimated output from the accepted original time steps. Internal adaptive subdivisions are not separately plotted.</p></div><span class="badge warn">Proxy DT1 motion · refined model</span></div>
+          <div class="card-body"><div class="grid" style="gap:16px"><div class="span6"><div style="color:#8399aa;font-size:10px;font-weight:700;margin-bottom:5px">Roof relative displacement</div><svg id="roofHistory" class="chart-svg" viewBox="0 0 520 260"></svg></div><div class="span6"><div style="color:#8399aa;font-size:10px;font-weight:700;margin-bottom:5px">First-story component restoring shear</div><svg id="baseHistory" class="chart-svg" viewBox="0 0 520 260"></svg></div></div></div>
+        </article>
+
+        <article class="card span12" id="pushover">
+          <div class="card-head"><div><h3>Static mechanism pushover</h3><p>Displacement-controlled Story-1 pushover. The curve terminates at the first-story mechanism/limit point rather than labeling loss of equilibrium as numerical collapse.</p></div><span class="badge good">Mechanism gate</span></div>
+          <div class="card-body"><svg id="pushoverChart" class="chart-svg" viewBox="0 0 760 300"></svg></div>
+        </article>
+
+        <article class="card span12" id="edps">
+          <div class="card-head">
+            <div><h3>Engineering demand parameter comparison</h3><p>Use the target selector to evaluate QuakeCore numerical parity against Perform3D or model-to-test agreement against the experiment.</p></div>
+            <div class="seg" id="targetSeg"><button class="active" data-target="perform3d">Target: Perform3D</button><button data-target="measured">Target: measured</button></div>
+          </div>
+          <div class="card-body">
+            <div style="overflow:auto"><table class="metric-table"><thead><tr><th>EDP</th><th class="num">Measured</th><th class="num">Perform3D</th><th class="num">QuakeCore</th><th class="num">QC error vs target</th><th class="num">Initial tolerance</th></tr></thead><tbody id="edpRows"></tbody></table></div>
+          </div>
+        </article>
+
+        <article class="card span7" id="readiness">
+          <div class="card-head"><div><h3>Strict parity readiness</h3><p>These are model/input prerequisites, not post-processing preferences. A run should not be labeled apples-to-apples Perform3D parity until the blocked items are closed.</p></div></div>
+          <div class="card-body"><div class="checklist" id="checklist"></div></div>
+        </article>
+
+        <article class="card span5">
+          <div class="card-head"><div><h3>Validation hierarchy</h3><p>Separates software parity from model-form accuracy.</p></div></div>
+          <div class="card-body">
+            <svg viewBox="0 0 440 315" style="width:100%;height:auto;display:block">
+              <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#476579"/></marker></defs>
+              <g font-size="11" font-weight="700" text-anchor="middle">
+                <rect x="110" y="15" width="220" height="48" rx="12" fill="#102634" stroke="#285067"/><text x="220" y="36" fill="#dff7fa">Gate A · Model / modal parity</text><text x="220" y="52" fill="#8199aa" font-size="9" font-weight="500">T₁, mass, damping, P-Delta</text>
+                <path d="M220 64 L220 91" stroke="#476579" marker-end="url(#arrow)"/>
+                <rect x="110" y="96" width="220" height="48" rx="12" fill="#102634" stroke="#285067"/><text x="220" y="117" fill="#dff7fa">Gate B · Nonlinear parity</text><text x="220" y="133" fill="#8199aa" font-size="9" font-weight="500">Drift, shear, residual response</text>
+                <path d="M220 145 L220 172" stroke="#476579" marker-end="url(#arrow)"/>
+                <rect x="110" y="177" width="220" height="48" rx="12" fill="#102634" stroke="#285067"/><text x="220" y="198" fill="#dff7fa">Gate C · Solver invariance</text><text x="220" y="214" fill="#8199aa" font-size="9" font-weight="500">Full ≈ SamePattern ≈ Woodbury</text>
+                <path d="M220 226 L220 253" stroke="#476579" marker-end="url(#arrow)"/>
+                <rect x="110" y="258" width="220" height="48" rx="12" fill="#152333" stroke="#4a608c"/><text x="220" y="279" fill="#dce7ff">Gate D · Physical comparison</text><text x="220" y="295" fill="#8496bd" font-size="9" font-weight="500">Model-form accuracy vs shake table</text>
+              </g>
+            </svg>
+          </div>
+        </article>
+
+        <article class="card span12" id="schema">
+          <div class="card-head"><div><h3>QuakeCore result import schema</h3><p>Minimum keys populate the published EDP dashboard. Optional arrays unlock story shear and time-history views in future runs.</p></div><label class="btn primary" for="fileInput">Load result JSON</label></div>
+          <div class="card-body">
+            <div class="grid" style="gap:12px">
+              <div class="span6"><div class="schema" id="schemaText"></div></div>
+              <div class="span6">
+                <div class="callout"><strong>No silent substitutions:</strong> the current benchmark still lacks the measured DT1 shake-table acceleration file locally. Importing a QuakeCore result does not upgrade the benchmark to “strict parity” unless the model and input-motion prerequisites are satisfied.</div>
+                <div style="margin-top:12px;color:#7890a2;font-size:10.5px">Optional result fields supported by this dashboard:</div>
+                <ul style="color:#8399aa;font-size:10.5px;line-height:1.7;padding-left:18px">
+                  <li><code>peak_inertial_story_reaction_kip: [S1,S2,S3]</code></li>
+                  <li><code>peak_floor_acceleration_g: [F1,F2,Roof]</code></li>
+                  <li><code>time_s</code> plus response-history arrays</li>
+                  <li><code>solver</code>, <code>elapsed_s</code>, <code>newton_iterations</code></li>
+                  <li><code>input_motion_provenance</code> for strict-parity traceability</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+      <div class="footer">QuakeCore external validation UI · published reference targets are embedded from the repository manifest · embedded QuakeCore refined run · pre-validation until strict-parity blockers are closed.</div>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const REF = {
+  model:{stories:3,bays:3,bay_width_in:70,story_height_in:48,drift_height_in:39,floor_weights_kip:[19.6,19.6,19.3],total_weight_kip:58.5,concrete_fc_ksi:3.57},
+  measured:{name:'Measured test',short:'Measured',first_mode_period_s:0.34,peak_base_shear_kip:29.8,peak_base_shear_over_weight:0.51,peak_story_drift_percent:[5.18,4.70,2.61],residual_story1_drift_percent:0.30,residual_roof_drift_percent:0.24},
+  perform3d:{name:'Perform3D',short:'Perform3D',first_mode_period_s:0.48,peak_base_shear_kip:27.9,peak_base_shear_over_weight:0.48,peak_story_drift_percent:[6.07,3.92,1.91],residual_story1_drift_percent:3.0,residual_roof_drift_percent:1.9},
+  ground_motion:{event:'1985 Valparaiso, Chile',station:'Llolleo',component:'100',nominal_amplitude_scale:4.06,published_test_pga_g:1.52,status:'Measured DT1 table history not yet acquired locally'}
+};
+const DEFAULT_QC = {"benchmark_id":"nist_gcr_22_917_50_uc_berkeley_3story_dt1","release":"QuakeCore Phase 8.1 RC1","validation_status":"PRE-VALIDATION_PHASE8_1_RC1_PROXY_INPUT","first_mode_period_s":0.48,"peak_inertial_base_reaction_kip":38.5262583082,"peak_inertial_base_reaction_over_weight":0.6585685181,"peak_reduced_generalized_restoring_force_kip":37.8162053778,"peak_first_story_column_restoring_shear_kip":25.7371390903,"peak_first_story_component_restoring_shear_kip":28.7984107997,"peak_first_story_component_restoring_shear_over_weight":0.4922805265,"peak_first_story_column_restoring_shear_over_weight":0.4399510956,"legacy_peak_base_shear_kip":38.5262583082,"peak_story_drift_percent":[3.27759621,4.2482242732,2.176073734],"residual_story1_drift_percent":2.0780645315,"residual_roof_drift_percent":1.3513228371,"peak_inertial_story_reaction_kip":[38.5262583082,41.0344048764,25.888448802],"peak_floor_acceleration_g":[1.597552062,1.1536082761,1.3413704043],"peak_roof_displacement_in":3.6376204757,"story_drift_height_in":39.0,"time_s":[0.01,0.21,0.41,0.61,0.81,1.01,1.21,1.41,1.61,1.81,2.01,2.21,2.41,2.61,2.81,3.01,3.21,3.41,3.61,3.81,4.01,4.21,4.41,4.61,4.81,5.01,5.21,5.41,5.61,5.81,6.01,6.21,6.41,6.61,6.81,7.01,7.21,7.41,7.61,7.81,8.01,8.21,8.41,8.61,8.81,9.01,9.21,9.41,9.61,9.81,10.01,10.21,10.41,10.61,10.81,11.01,11.21,11.41,11.61,11.81,12.01,12.21,12.41,12.61,12.81,13.01,13.21,13.41,13.61,13.81,14.01,14.21,14.41,14.61,14.81,15.01,15.21,15.41,15.61,15.81,16.01,16.21,16.41,16.61,16.81,17.01,17.21,17.41,17.61,17.81,18.01,18.21,18.41,18.61,18.81,19.01,19.21,19.41,19.61,19.81,20.01,20.21,20.41,20.61,20.81,21.01,21.21,21.41,21.61,21.81,22.01,22.21,22.41,22.61,22.81,23.01,23.21,23.41,23.61,23.81,24.01,24.21,24.41,24.61,24.81,25.01,25.21,25.41,25.61,25.81,26.01,26.21,26.41,26.61,26.81,27.01,27.21,27.41,27.61,27.81,28.01,28.21,28.41,28.61,28.81,29.01,29.21,29.41,29.61,29.81,30.01,30.21,30.41,30.61,30.81,31.01,31.21,31.41,31.61,31.81,32.01,32.21,32.41,32.61,32.81,33.01,33.21,33.41,33.61,33.81,34.01,34.21,34.41,34.61,34.81,35.01,35.21,35.41,35.61,35.81,36.01,36.21,36.41,36.61,36.81,37.01,37.21,37.41,37.61,37.81,38.01,38.21,38.41,38.61,38.81,39.01,39.21,39.41,39.61,39.81,40.01,40.21,40.41,40.61,40.81,41.01,41.21,41.41,41.61,41.81,42.01,42.21,42.41,42.61,42.81,43.01,43.21,43.41,43.61,43.81,44.01,44.21,44.41,44.61,44.81,45.01,45.21,45.41,45.61,45.81,46.01,46.21,46.41,46.61,46.81,47.01,47.21,47.41,47.61,47.81,48.01,48.21,48.41,48.61,48.81,49.01,49.21,49.41,49.61,49.81,50.01,50.21,50.41,50.61,50.81,51.01,51.21,51.41,51.61,51.81,52.01,52.21,52.41,52.61,52.81,53.01,53.21,53.41,53.61,53.81,54.01,54.21,54.41,54.61,54.81,55.01,55.21,55.41,55.61,55.81,56.01,56.21,56.41,56.61,56.81,57.01,57.21,57.41,57.61,57.81,58.01,58.21,58.41,58.61,58.81,59.01,59.21,59.41,59.61,59.81,60.01,60.21,60.41,60.61,60.81,61.01,61.21,61.41,61.61,61.81,62.01,62.21,62.41,62.61,62.81,63.01,63.21,63.41,63.61,63.81,64.01,64.21,64.41,64.61,64.81,65.01,65.21,65.41,65.61,65.81,66.01,66.21,66.41,66.61,66.81,67.01,67.21,67.41,67.61,67.81,68.01,68.21,68.41,68.61,68.81,69.01,69.21,69.41,69.61,69.81,70.0],"roof_displacement_in":[2.429e-07,0.0022124205,0.0182577429,-0.0106115316,0.0303409947,0.007009759,0.1741714776,-0.2814607385,0.176337159,-0.3090670891,-0.1196630054,0.330773549,-0.3818659796,-0.0146896819,0.6042896832,-0.329524766,1.1063473297,-1.9087328311,1.69031934,-1.0983765562,0.1686785529,-0.1157193206,-1.2857345793,1.5126235082,-0.8471547942,-0.9871847349,3.1422540333,-0.8863934029,0.3793048939,0.0553348988,2.0797315586,-0.7048650536,0.3560220516,1.2988111166,1.4762633171,0.5239468342,-0.1998491916,-0.0223946143,1.6449700836,0.050143655,0.9502372081,-0.2970286699,1.7886171553,-0.400993164,2.5652814734,-0.2614601122,-1.1337113476,2.130671441,0.4502764463,-0.9792527694,0.8097594534,0.4236802702,2.9648111526,-0.5140592344,0.7005099445,0.2973925997,1.7404323063,-0.2329795988,0.1278460636,0.4585335587,-0.136115638,0.2830256018,1.9686604762,-0.224925249,0.8340586277,1.0829703247,2.1460000703,-1.1489611687,1.6111902933,-0.0038486293,1.1340835186,0.959345014,-0.522836197,1.3604613004,1.0170005859,-0.3018763749,2.8098947109,-0.1198503071,0.4996161419,0.1416959288,2.1924139848,-0.4758173001,0.1602666276,1.1150741672,1.5361140834,0.4516307253,-0.2078005587,0.0046464152,1.7427199221,0.321224947,1.0272005163,-0.1751555663,1.8951605477,-0.2709269575,2.5860477354,-0.0038279317,-1.0403419194,2.0690833606,0.731633621,-0.7524102734,0.7349813556,0.4567397047,3.0180914426,-0.2729817749,0.8395350185,0.4207091136,1.8622034589,-0.0633992747,0.2743933371,0.5914387277,0.0250074972,0.3861095119,2.0650317459,0.0143807871,0.9002148815,1.1492835562,2.2926997147,-0.8827850036,1.5607916316,0.0102249895,1.224760666,1.1172430548,-0.3466328168,1.344291257,1.0757461069,-0.1480322771,2.8592691545,0.1138508447,0.6199460021,0.2399386299,2.2828219012,-0.179787025,0.1023950196,0.9519597448,1.556852779,0.3984493874,-0.2543195773,-0.0682282849,1.715557386,0.5460538529,1.132712826,-0.0775829955,1.9559075219,-0.1430785902,2.5847773309,0.2228933627,-0.9127729443,1.990629419,0.9685464495,-0.4746370848,0.7817422926,0.5561524106,3.080301533,-0.0040773985,0.9294749591,0.5054808301,1.8152624179,0.1640079396,0.4280924226,0.7463758776,0.2813206988,0.5074884369,1.9312029998,0.4162000852,0.9905079322,1.1699326268,2.0536017803,-0.3630391904,1.4718531396,0.2943378568,1.2143723092,1.136302345,0.1386766907,1.3078024797,1.0778361354,0.2911993305,2.253966571,0.4526450677,0.8514217178,0.5763309239,1.7766922052,0.3213048308,0.502324615,0.8406433115,1.2272688192,0.6631698564,0.3107877431,0.3908668885,1.2555014168,0.6813007601,1.0579638714,0.4075152001,1.4484098272,0.3733871435,1.7086272274,0.476165608,0.082098069,1.3311223935,0.7972002855,0.294313687,0.8847169324,0.7715557328,1.8942437635,0.6225504897,1.0735405162,0.8121332934,1.3810921932,0.6068033621,0.8000300252,0.8838835806,0.7073164222,0.8468931138,1.3665886475,0.7718119909,1.0522278519,1.0787131417,1.4615220917,0.4308067156,1.2834671332,0.7016790384,1.1427046547,1.1068699108,0.7071276736,1.2399256534,1.0843286887,0.7753181585,1.6319420377,0.8030723646,1.0477030174,0.9137751491,1.4076899757,0.7691230539,0.9182355771,0.9896182305,1.1670153023,0.9757015207,0.8279134253,0.8740963716,1.1913956929,0.9272559024,1.1546467385,0.8513275113,1.3151423381,0.8279096877,1.4151916421,0.8099944683,0.6907018444,1.217153194,0.9515182567,0.7719806281,1.0393056557,0.9909090072,1.4899062181,0.9202127857,1.1465863358,1.015699893,1.2739590892,0.9184515758,1.0304850867,1.0540704895,0.9921312071,1.0666655467,1.2388101237,1.0090511322,1.1608235244,1.1633249216,1.3357103906,0.888179681,1.2792716329,1.0002714828,1.2086803012,1.1941699483,1.0449007765,1.2929641895,1.2070253903,1.0890654868,1.4655512036,1.0806435636,1.2193362353,1.1619030219,1.3753148629,1.0886938652,1.1860804366,1.1858429881,1.2697241962,1.2150862083,1.1589686209,1.1827070431,1.3006683553,1.1819830832,1.3143368659,1.1788620495,1.3935523148,1.1717013878,1.4439339966,1.1507776568,1.1252785314,1.3609214478,1.2231897577,1.1742817745,1.297608953,1.2773219204,1.5040810747,1.2407150883,1.3614176402,1.3025795522,1.4294463212,1.2587914495,1.3282794692,1.3329493317,1.3148078301,1.3727976108,1.4198082465,1.324576147,1.416330193,1.4131709556,1.4868354043,1.2851905169,1.4797492366,1.340898833,1.443409862,1.4320303103,1.3828579744,1.511167978,1.4514034515,1.4172457212,1.461811203,1.4774575127,1.4913469311,1.5051730598,1.5154725999,1.5329368676,1.542656433,1.5537010898,1.5657486225,1.5766693749,1.5858700257,1.5939122328,1.6043731402,1.6097504538,1.6174991293,1.6232686318,1.6288145551,1.6330163298,1.638150587,1.6419530402,1.6451446466,1.6488035486,1.6517737155,1.6546115929,1.6571672605],"inertial_base_reaction_kip_history":[-2.20193e-05,-0.0152378081,-0.0369320485,0.0710484385,0.8525781637,0.9425356147,-4.2754476831,5.6214852644,-6.0346562233,0.5096137976,4.7311889217,-11.1024744267,6.7612290136,8.7669244555,-9.0455826059,8.9308105044,-10.8458624622,22.8310580869,-24.6642596789,10.1533323262,-19.4396411065,7.7360518093,15.9015380222,-27.4682068921,27.995715516,4.5363939227,-13.8093726657,25.1569601075,-5.732076667,-7.3629916811,-11.6724677055,9.1746159084,-9.1591759599,-1.357843316,-1.3998431901,10.1033099574,12.7873608179,-14.4078215534,6.574876757,-2.585658171,-8.3726641567,11.6404523097,-15.221683957,17.3128618665,-19.4077626124,12.1606997333,22.6340909387,-28.9633341721,1.621652396,12.3488378104,-9.7636352248,-1.9432772306,-5.1852970318,11.8596649424,12.8455025695,7.7018840256,-18.6642309305,14.5933800126,-13.7183057657,-8.4100549794,12.0159031627,-22.5319019796,-2.2755086495,24.3460627295,-0.7148162063,1.1635540689,1.530431543,18.4515745763,-9.569951551,-8.48950755,-19.5506532062,3.7465319143,8.7254947186,-14.0144142024,13.6174464436,8.122585256,-4.2340260574,14.9930185558,-1.317258573,-6.9315261625,-12.946596869,8.1543946496,-8.3197877731,-1.8796421345,-2.1918494011,10.6962616331,12.4167397145,-13.4319389998,6.4355523872,-2.7145201968,-6.9687689906,10.4942460909,-14.5656766201,16.0877547747,-19.0564672544,10.2911806197,21.7783667537,-26.6907274056,1.7192051817,11.4082391566,-8.4607085258,-2.1504574805,-5.0560504794,9.7403569456,13.4133467336,7.359665991,-18.3264206019,14.2586344561,-13.495723019,-8.1211979925,11.6278301071,-22.4341764386,-1.8543163662,21.8344540511,-0.1491602426,1.3367095871,0.6205680479,17.3282132908,-7.4458075291,-8.8904916701,-18.1403251101,3.1203293216,7.7547773523,-12.3313532749,12.429819147,7.3712384674,-3.0070752992,12.7417883253,0.0623491479,-6.498334075,-12.8065107927,7.019219386,-7.8298336833,-2.5696280546,-2.5987283354,10.2982869208,12.0553076926,-12.245428915,6.4566197404,-2.9918004677,-5.8008766486,9.2076740747,-13.5956603013,14.8765015225,-18.0629388631,8.9501220706,20.5300122863,-24.5521649517,1.745953009,10.2666483197,-7.0927672777,-2.1381384438,-6.493654131,8.1710620979,12.6744333459,6.1212198797,-15.8843022012,12.2129840614,-11.41045933,-6.3867354257,9.6453721956,-18.2922670779,-0.0778856964,16.6560887362,0.2815396966,1.0041582229,0.8773379229,12.9898363908,-6.2105730108,-5.9106472353,-13.4696194166,2.5940438042,5.5609189638,-9.0596717506,9.1808420598,4.711405152,-2.4577864168,8.3772435765,-0.6998609425,-4.0193795207,-6.9588205067,4.3581699031,-5.0835840425,-0.3304042199,-1.9156156713,5.9023210171,6.651822187,-7.0688823223,4.3507924665,-2.1910118118,-3.5641445952,5.5830442321,-7.4581157005,7.6833718875,-9.3721339629,5.5680541635,8.9526149808,-11.7861353939,1.3606622256,4.326598333,-3.5088123489,-0.9229459731,-1.7940208827,3.2881211553,5.3276501785,3.106783773,-7.7682044071,6.2645187048,-5.4058901187,-2.8131282102,4.4275820009,-8.5050999165,1.8887327179,7.6179139406,-0.2963979794,0.5667951832,0.7312304055,5.6832709604,-3.6078562205,-1.9504971554,-6.4055633194,1.5090107911,2.4925196363,-4.5768207073,4.7405960591,1.882290832,-1.2394882921,4.2144437899,-0.9779880178,-1.7937153897,-2.4198213126,2.0258057646,-2.6906380451,0.5476803159,-1.0880636964,2.453623359,2.9106863992,-3.3292903721,2.3334066284,-1.1742204496,-1.9852839484,2.860096385,-3.6290235437,3.634709243,-4.3286559458,3.0186633782,3.71183258,-5.1632861575,0.4997714815,1.7710867471,-1.469022991,-0.3992605263,-0.3944736173,1.5801138422,2.1310481797,1.5072069008,-3.7518632922,3.0072703498,-2.4333982489,-1.2734046186,1.9768669533,-3.935703359,1.1370699943,3.3362181534,-0.239872151,0.2620089562,0.3260245991,2.3910840963,-1.9284729126,-0.53207936,-3.048652208,0.8716282494,1.12901053,-2.2036305922,2.3902851779,0.7254863231,-0.6458940302,1.9529948712,-0.7569616415,-0.7828355002,-0.9758872907,0.9792169661,-1.4092068509,0.5420519592,-0.5616696129,1.0986657499,1.233663658,-1.5269780445,1.0755704517,-0.5188220192,-1.0665398659,1.48017656,-1.7832722855,1.7780463416,-2.1184811989,1.4845148899,1.506065986,-2.3773780482,0.2416064796,0.6962982645,-0.7103195962,-0.1821851827,-0.0969919683,0.7503489797,0.8375598199,0.7552438223,-1.9372657673,1.4527720122,-1.1508937934,-0.6202222258,0.9981198922,-1.8445420752,0.5791608586,1.5741629245,-0.2346580115,0.1278167132,0.1151644596,0.9835704887,-1.0558052839,0.0121057074,-1.5410726571,0.5811443153,0.5618436953,-1.2039523649,1.3303633145,0.3572144511,-0.7335906447,0.1302230988,0.2065450103,-0.0962901624,-0.0749108939,0.0564714749,0.0196024494,-0.0599173196,0.0294840935,0.0242171966,-0.0466245243,0.0122891118,0.0055944856,-0.0029554751,-0.0207739091,0.0283056825,-0.0060226983,-0.0048024581,0.0092312671,0.0132682794,-0.00725446,0.007295866,0.0102584245,-0.0041869588,0.0025647895],"reduced_generalized_restoring_force_kip_history":[1.4968e-05,0.0180839182,0.0720190115,-0.1430961569,-0.6839962581,-1.0960181073,4.2801384799,-5.5888240667,5.5886272862,-0.0645644729,-4.830554336,10.3856127161,-5.434392434,-9.4711684859,9.7947608906,-9.3628285199,11.3394205516,-23.0158444969,24.5218107141,-10.8120334557,18.6162806253,-6.5773427481,-16.821480607,27.3035733257,-26.3840547956,-6.4274954266,16.331079746,-25.7807769653,5.866771172,6.5293488098,12.0009421981,-8.5491541521,7.0968509189,1.4795167221,2.2611559663,-10.340616534,-12.054102196,12.8417365847,-4.6744802015,2.1269150623,8.3910045862,-11.6759532718,15.5555269922,-17.0868655456,18.591039254,-12.0039106624,-22.3048872345,27.3371081721,-0.7223284259,-12.7749384547,9.8596330674,2.2552443587,6.4780006866,-12.6113182355,-11.2429219089,-8.4078359084,17.9080441877,-14.1520712352,11.9086125299,8.8396721638,-11.1982559764,19.8209793901,4.9396537513,-23.6804954798,0.9778289669,-1.2224865598,-1.2678641283,-18.1758099449,9.5741348615,6.715911345,18.922584532,-2.9609449069,-8.8749977483,13.6016369005,-12.6342405881,-8.6886258247,6.1962964641,-15.8040422087,1.6589462099,6.035293827,13.2346025385,-7.4724673904,6.4133571719,1.8508316095,3.1322748756,-10.9305990348,-11.6649125117,11.8950489672,-4.6680070417,2.3562660424,6.9591137013,-10.5773185914,14.8897587886,-15.8747353267,18.2077351896,-10.2224525423,-21.3379634132,25.0935896043,-0.927587843,-11.6888538601,8.5644249138,2.4235730871,6.1938923148,-10.4767948939,-11.7882585009,-8.0538371916,17.564833442,-13.8336629191,11.7034953167,8.5389176793,-10.8192002073,19.7661779446,4.4055288446,-21.1531641794,0.5029109999,-1.431596487,-0.3841922649,-16.9674161773,7.4945586926,7.0891372224,17.4750198182,-2.4126928677,-7.8293660794,11.9045871015,-11.5328887565,-7.8159467657,4.8994865395,-13.5120213686,0.340045256,5.6085167429,12.9857878349,-6.2800962999,6.0580590434,2.4526552221,3.5425940965,-10.5210817766,-11.2681378219,10.7663123557,-4.7923265782,2.6949915577,5.7763450949,-9.3632066309,13.8628070859,-14.6856229137,17.1804617629,-8.9600533127,-19.9736423046,23.0294133948,-1.0703951099,-10.4507169978,7.2174804602,2.3551798376,7.5451926631,-8.76367123,-11.1665124879,-6.7257511202,15.1804157066,-11.8447621958,9.8770831001,6.73740749,-8.9756127105,16.1227416366,2.0869964337,-16.1083146057,0.0256536686,-1.0705429853,-0.7008427439,-12.7812741161,6.2964763907,4.5723903329,13.0037771351,-2.0829785786,-5.6374278421,8.7938179264,-8.5673482118,-5.056385826,3.7531538059,-8.939849841,0.9629057776,3.4921664484,7.144110435,-3.9769159652,4.0947413837,0.2632385938,2.4101923021,-6.048063305,-6.2306884944,6.2820946668,-3.4056168882,1.9684846078,3.5831485728,-5.6507478339,7.5992802341,-7.612206502,8.9874054567,-5.6097006653,-8.7151279992,11.1351035149,-1.0815141156,-4.4636064039,3.5922884417,1.0233033702,2.3068831658,-3.6912562765,-4.6198636419,-3.3933584841,7.4665170613,-6.1066913611,4.715901155,2.9917572281,-4.1387432276,7.5434571276,-0.9652111197,-7.4612193336,0.4442477715,-0.5944601312,-0.6594261707,-5.680845701,3.7014718452,1.3320260719,6.2034342065,-1.2751894465,-2.5593629295,4.4837449753,-4.4663950357,-2.0876390185,1.8830793349,-4.5277092841,1.0936444658,1.5753178231,2.5432954274,-1.9070775139,2.2707514666,-0.5551722359,1.2587542365,-2.5256052824,-2.7402355231,2.980429746,-1.8713172602,1.0353951424,2.0163074693,-2.8837712667,3.7007975411,-3.6066156909,4.1750829729,-3.0466560291,-3.6232354859,4.8780527637,-0.3834488764,-1.8483190946,1.5088611892,0.4397766327,0.6426865964,-1.7890624067,-1.8085606238,-1.6415155785,3.6203912813,-2.9384303944,2.1189908523,1.3587476356,-1.8590622121,3.5143214872,-0.717143631,-3.2917244679,0.2989853769,-0.2779765994,-0.2929422886,-2.4129405882,1.9887401638,0.2577013172,2.958997398,-0.763819366,-1.1730061892,2.1717398617,-2.2693617051,-0.826548309,0.9414570435,-2.0987087983,0.8038949471,0.6864298611,1.039452291,-0.9431967455,1.2254465033,-0.5322242577,0.6219984571,-1.1376652674,-1.1651736895,1.3690822847,-0.8517652229,0.4416802964,1.0898268612,-1.490688729,1.8168996561,-1.7702996276,2.0539993744,-1.4993932424,-1.4776609424,2.2537200644,-0.1890510517,-0.7378546191,0.7304731615,0.1963735119,0.2141236987,-0.8555711096,-0.6908333551,-0.8240260179,1.8775517121,-1.4192825859,1.0008971256,0.6717236611,-0.9561898586,1.6489463285,-0.3740699893,-1.5699394326,0.2589061993,-0.1393121576,-0.0941110846,-1.0027606394,1.0925516602,-0.1352124489,1.5020369355,-0.5283465444,-0.5952912823,1.1936423632,-1.2757040073,-0.3918474435,0.7181571473,-0.111121079,-0.2179512943,0.0885436478,0.0729326794,-0.0587471242,-0.0268347431,0.0572108214,-0.0309801923,-0.0302021059,0.0449205494,-0.014613328,-0.0078552668,0.0004012848,0.0192857648,-0.028809301,0.003459826,0.0040436652,-0.0101005281,-0.0146232712,0.0061631515,-0.0078564537,-0.0116050079,0.0028597284,-0.0033033323],"first_story_column_restoring_shear_kip_history":[1.53038e-05,0.0187590063,0.0754592484,-0.1469317703,-0.6961446882,-1.1209257441,4.3915274097,-5.7408792943,5.7261899418,-0.0918893518,-4.9504455347,10.6485798888,-5.5839370364,-9.6915044317,10.0658704102,-9.5100941228,11.7103610599,-22.9472950553,22.7301963741,-9.4383808772,15.3324299866,-2.1976471432,-17.768420652,24.1287495738,-17.3201729588,-7.4901609701,17.8715549639,-19.7696573176,1.5249165913,3.4610932634,11.8923425293,-3.8475140273,4.2890492156,0.6471921119,2.6016100515,-6.3312955413,-9.4251088628,3.3575525567,-1.9045636282,0.172740678,7.7714567757,-7.4425804478,14.3552534047,-8.0124927097,15.6252590788,-7.525978908,-17.8737734978,13.3967538633,0.1285169118,-11.9703253092,4.873734691,3.1279058836,7.5144512427,-10.2544179168,-3.1013991419,-7.653631107,12.0947096292,-8.1144715082,2.9123878319,6.2594895043,-5.6588482429,7.2456410766,6.1588135588,-13.8385880467,0.2598255554,-0.5642170275,-0.5025680212,-14.7708190244,7.5218810383,1.6046232584,13.4072175879,-0.0556486266,-6.0333532607,10.1596560913,-4.6164955064,-8.9431434059,5.6597903202,-11.4881596163,0.1981935791,2.9451629682,11.8426968256,-2.2217150851,3.1095047705,1.0570720107,4.2884219857,-6.5435943248,-9.2129279208,3.0759507204,-2.0999837037,0.5520357694,6.5880546428,-6.8417635764,12.2744307087,-6.6454958244,15.3397981428,-5.6915651295,-15.4220135592,11.3316752132,0.08224201,-10.7226201055,3.75217342,3.0619048448,7.2472941994,-7.1329252029,-2.877132793,-6.5408061593,10.982456611,-7.2471397909,2.8504200585,5.6851130824,-4.9795109546,6.8004146503,6.2516676823,-11.1329857345,0.6885623067,-0.0798696417,-0.0358900487,-11.8568690669,5.5707193232,2.0523927929,10.3713026649,0.0570115159,-6.3189531428,8.0049697302,-3.7984097423,-7.3868037006,5.4119615761,-8.7687060793,0.2874757195,2.3940946746,11.6752994216,-0.9184907165,3.4461721335,1.3079726313,4.9613563389,-5.8312588193,-7.8085572153,3.1466192573,-2.0773517084,1.1478843224,5.4032675077,-5.9532020987,10.812316107,-5.3205987012,12.1360634154,-5.1032210215,-12.4462362093,9.7898462182,0.0084919754,-8.5268358919,2.9744859119,2.743023508,9.3717163924,-5.3638694158,-2.4544167482,-4.9796335198,9.3723048123,-5.655664063,2.7108736896,4.4601755284,-4.0433847493,5.6012750673,2.7442643256,-7.9861188142,0.2806484622,-0.1714980278,-0.1507383773,-9.2629250274,5.1803737589,1.3625185727,8.3806878115,-0.0151578206,-4.8907231282,6.7498999991,-2.8343483135,-4.7164132981,3.931990999,-6.1211421352,0.4998751193,1.8382471236,5.9978536163,-0.6656266887,2.8722438183,0.5307627912,2.9940191282,-3.1447559596,-3.9694791347,1.9489155765,-1.4284673946,0.7568709173,3.1883222345,-3.3011727943,6.5882053739,-2.6358129388,6.8940101801,-3.4770333644,-5.1533757625,5.3064103392,-0.5086368606,-3.9200529278,1.91314556,1.5302622715,1.3989233826,-1.6944417623,-0.9237612125,-2.2626764909,5.3455585076,-2.9159084512,1.7261043459,2.4469406165,-1.5140716525,3.4439714857,0.361847,-3.7484770182,0.5311331888,0.030180637,-0.1442694721,-4.5759489204,3.1033334756,0.6417014252,4.6902126756,-0.0086180293,-1.9118528556,4.3058737808,-1.429775556,-1.7895178066,1.0648935455,-3.1743986173,0.8174810214,1.3494643092,2.0690944266,-0.3297439048,1.9159871878,-0.0044382802,1.7074876252,-1.0371449785,-1.4951413778,1.3938760574,-0.5982572986,0.5896209003,1.9978157966,-1.2695942032,3.8600913242,-1.0156396828,4.2247760144,-1.686723021,-1.8467770831,2.8158022655,0.3222718505,-1.2471257315,1.3085826442,0.8898623425,0.9568164973,-0.9837245688,-0.2170401351,-0.8058346025,3.223899528,-1.161118049,1.2574311482,1.6040263585,-0.3823758765,2.4235950682,0.3183497605,-1.3237127605,0.7223134641,0.2353141634,0.207759045,-1.6560041239,2.4100850772,0.4419539981,2.925214043,0.0738464469,-0.505826354,2.5073675268,-0.499468077,-0.3529395297,1.2330695971,-1.2478185379,1.1178732069,1.117929157,1.3659828447,0.046664862,1.5238493847,0.1749599506,1.1885942892,-0.1689285191,-0.3141379584,1.3010683858,0.0143459971,0.7389252129,1.5346882679,-0.2643902783,2.3716458664,-0.2239880641,2.617319156,-0.4966817022,-0.339670559,2.2102695983,0.57479651,-0.0264750446,1.2615523172,0.8613268063,1.0658218597,-0.0922236954,0.2469385028,-0.0290774595,2.3580374737,-0.1972907236,1.3219316,1.4321580939,0.08930934,1.9722265928,0.5906611117,-0.270746769,0.9504261652,0.6521659037,0.7085378531,-0.2352819558,1.7367298876,0.5634656079,2.1892064556,0.392769511,0.2206628611,1.870708322,-0.0624730291,0.3894547297,1.4692125183,0.754373389,0.5843668044,0.9429245423,0.9515152201,0.8090515389,0.8557499211,0.9719187071,0.8696787284,0.8898162414,0.9197342365,0.9025920639,0.9392174474,0.9167525492,0.9565813619,0.9191883148,0.9482925455,0.95541979,0.9474184317,0.9428892377,0.964389227,0.9536615011,0.9494761249,0.9654526512,0.9603698386],"first_story_component_restoring_shear_kip_history":[1.51372e-05,0.0184230662,0.0737457287,-0.1450261018,-0.690126794,-1.1085639917,4.3361961774,-5.665328145,5.6578801571,-0.0782397599,-4.890908286,10.517975621,-5.5096275597,-9.5782388037,9.9259729408,-9.3838056477,11.529758628,-22.3573213361,22.3767772151,-10.2261077069,15.61829278,-3.2906683933,-17.4833893026,24.3829099932,-18.9644824382,-6.9582718411,16.8351351804,-21.3159626695,2.9947717868,4.3794639435,12.2298440757,-5.4246156128,5.1237857728,1.5160665644,2.8314048414,-7.5877184074,-10.6829610721,6.7970426374,-2.476654636,0.7778267993,8.0180350576,-8.8552839306,14.4069240924,-11.0218221972,15.9170963371,-9.022506184,-18.9358631064,18.2532322681,-0.171513108,-11.7936896023,6.5286563478,2.7403207624,7.0754700753,-10.2072609662,-5.5328958264,-7.8947158023,11.2379601476,-8.3006775838,5.3268856212,6.8572940595,-6.5453442549,8.496173617,4.9262525798,-13.0141211999,0.519114978,-0.6626380916,-1.0585067918,-13.7909552181,7.4707335325,3.6690126604,12.3321068886,-1.2144588244,-7.621708374,10.3276389766,-5.8220092845,-9.0298234921,6.1943671458,-11.3485593355,0.743778558,3.9853211731,11.4570958698,-3.979196754,4.1079479759,1.1077823971,3.800928864,-7.3432165877,-9.7095313697,4.9221626711,-2.5286228654,1.4775858601,6.8481293769,-6.8643909295,12.4165426953,-7.8664875172,14.2916232987,-6.2151066183,-13.9071004609,12.2391450867,-0.3221756815,-10.0594942703,5.1988302912,2.6614395879,6.8990848128,-8.5595997922,-5.5452292388,-7.1669648379,10.9922463898,-7.7647602376,5.4712345466,6.7666438093,-5.9967444393,8.6497105111,4.7623036575,-7.5295654875,0.6185296024,-0.7750974327,-0.560107091,-8.4850460189,5.659531366,3.0177345187,7.3773075615,-1.3126712973,-6.6443883721,6.7776409733,-3.7003631236,-7.1162432196,4.582872884,-6.8089323065,0.1659878805,3.0627320922,11.1652278107,-2.7046825012,3.6636881021,1.0186368296,4.6021260249,-5.5629383029,-7.5657154933,3.1941897583,-2.8672658531,1.7342138549,5.4055450247,-5.1216263276,8.8652597111,-4.5295907891,10.028650137,-4.3210873633,-8.6354997617,6.610740809,-0.5610804545,-6.9907797734,3.6743385469,2.9640559882,8.1486873337,-5.8889586228,-3.3229985716,-5.0528703312,7.4385325124,-4.6444560618,3.542692816,4.6259313734,-4.0120138774,4.5253280059,1.3833570393,-5.4911859727,0.2584698429,-0.6336721096,-0.6535336776,-6.9386039649,5.6440901829,2.0912914565,6.8702295317,-1.0217538011,-4.7812887884,6.4635707229,-3.4739436173,-5.004238113,3.7495590682,-5.4863408323,0.6166117562,2.3710442209,6.3787082861,-1.796040244,3.2744764675,0.2362089116,2.8778260185,-3.7341023965,-4.8787922526,2.7260160874,-2.1380228935,1.2251982095,3.7024804176,-3.6787522166,6.3804161351,-3.5251457347,7.2190194008,-3.8465338055,-4.5363232674,5.3519936417,-0.7590699826,-4.1658337991,2.4448459168,1.2982444636,1.292804157,-2.7545472776,-2.1520242692,-2.5681902253,5.7310660726,-3.4854035357,2.4922088479,2.7239051252,-2.3242983414,4.2032815784,-0.6158695148,-3.7248931348,0.543116713,-0.2228855834,-0.413812736,-4.7000070837,3.5249991353,0.7765713291,5.0003448345,-0.5793116771,-2.0411809377,4.4725924182,-2.2498111785,-1.7188666139,1.1525018311,-3.5127674973,0.9694882109,1.5571899729,2.1960143781,-0.990097884,2.2814188454,-0.2481032231,1.6225857299,-1.5094990863,-2.0338844239,2.0651849905,-1.2166215424,0.7108466773,2.1826162112,-1.8052188464,3.9422401458,-1.9787273887,4.3207162035,-2.1617912449,-2.3674170917,3.4397039067,-0.0271150433,-1.5139571421,1.4667514875,0.7468429217,0.7436213421,-1.3741457358,-0.919517658,-1.0675073761,3.527901362,-1.7597035732,1.7001184234,1.5817077736,-0.9376228572,2.9500656959,-0.2721319748,-1.9789612201,0.5969522958,0.0627691139,0.0049218473,-1.9079841971,2.359141025,0.3519596554,3.0879014954,-0.2957326094,-0.7116549393,2.4302274696,-1.1863492209,-0.5157139178,1.159956535,-1.5938985263,1.0607161229,1.0208176305,1.2071683548,-0.3949572681,1.5653474633,-0.1116536168,1.0040884459,-0.5193133029,-0.6579247786,1.4255013493,-0.4001891666,0.6390508404,1.4733674923,-0.7152877172,2.2113987597,-0.8467935126,2.4384090015,-0.8599062938,-0.7520907477,2.3504442131,0.2732228882,-0.3063486792,1.1163069654,0.6591169641,0.7414075762,-0.3986155545,-0.1560768323,-0.3153682687,2.2671010298,-0.6701435944,1.285417519,1.1779130813,-0.3404026665,1.962214506,0.2104272121,-0.7770525442,0.6964397197,0.3455538479,0.388914083,-0.5154474554,1.6365180831,0.3014136981,2.0045811024,0.000393932,-0.0764546862,1.7113968364,-0.5799645312,0.1034432263,1.2380570669,0.4263809333,0.2989551069,0.6317158566,0.6244351502,0.4976681532,0.5318773881,0.6239650437,0.5317691132,0.5524908255,0.5612013253,0.54986913,0.5852865903,0.5589077633,0.5941643609,0.5615348971,0.5798181584,0.5862886182,0.5772486695,0.5700429867,0.5918586449,0.5804379273,0.5755503517,0.5909679661,0.5855691332],"pushover":{"completed":true,"reason":"first-story mechanism/limit point reached near Story-1 drift 2.125000% at V=23.555310 kip; next displacement increment has no converged equilibrium","peak_base_shear_kip":23.5553100215,"story1_drift_at_peak_percent":2.125,"first_story_column_yield_drift_percent":[1.45,1.3,0.85,0.825],"all_first_story_columns_yield_drift_percent":1.45,"B1_shear_initiation_drift_percent":-1.0,"A1_shear_initiation_drift_percent":-1.0,"first_E_drift_percent":-1.0,"first_F_drift_percent":-1.0,"max_equilibrium_error_kip":0.0,"mechanism_reached":true,"last_tangent_positive_definite":true,"last_tangent_min_eigenvalue":1.4102118907,"last_tangent_min_pivot_ratio":5.5167e-06,"story1_drift_percent":[0.025,0.05,0.075,0.1,0.125,0.15,0.175,0.2,0.225,0.25,0.275,0.3,0.325,0.35,0.375,0.4,0.425,0.45,0.475,0.5,0.525,0.55,0.575,0.6,0.625,0.65,0.675,0.7,0.725,0.75,0.775,0.8,0.825,0.85,0.875,0.9,0.925,0.95,0.975,1.0,1.025,1.05,1.075,1.1,1.125,1.15,1.175,1.2,1.225,1.25,1.275,1.3,1.325,1.35,1.375,1.4,1.425,1.45,1.475,1.5,1.525,1.55,1.575,1.6,1.625,1.65,1.675,1.7,1.725,1.75,1.775,1.8,1.825,1.85,1.875,1.9,1.925,1.95,1.975,2.0,2.025,2.05,2.075,2.1,2.125],"base_shear_kip":[0.5015012982,1.0030025964,1.5045038946,2.0060051928,2.507506491,3.0090077892,3.5105090874,4.0120103856,4.5135116838,5.015012982,5.5165142801,6.0180155783,6.5195168765,7.0210181747,7.5225194729,8.0240207711,8.5255220693,9.0270233675,9.5285246657,10.0300259639,10.5315272621,11.0330285603,11.5345298585,12.0360311567,12.5375324549,13.0390337531,13.5405350513,14.0420363495,14.5435376477,15.0450389459,15.5465402441,16.0480415423,16.5413567595,16.8969488848,17.2236034797,17.5502580747,17.8769126696,18.1968117011,18.513561871,18.8303120409,19.1435703113,19.4563717336,19.7691731559,20.0819745783,20.3754147542,20.6407057082,20.9059966623,21.1712876163,21.4365785703,21.7018695244,21.9546923557,22.1165512607,22.22045167,22.3243520792,22.4282524884,22.5321528976,22.6360533069,22.7252167371,22.7848862507,22.8445557644,22.904225278,22.9638947916,23.0235643052,23.0832338188,23.1429033325,23.1844747634,23.2227078369,23.2609409104,23.2902460104,23.3110955573,23.3306862648,23.3502769722,23.3698676796,23.389458387,23.4090490945,23.4286398019,23.4482305093,23.4678212167,23.4874119242,23.5070026316,23.526593339,23.5457688598,23.5495724113,23.5524412164,23.5553100215]},"proxy_motion":{"pga_g":1.52,"response_spectrum_damping_ratio":0.05,"Sa_T0p48_g":1.9000012559,"Sa_T0p34_g":2.4229244002},"analysis_damping":{"mass_proportional_contribution_at_T1":0.025,"stiffness_proportional_contribution_at_T1":0.005,"total_at_T1":0.03,"note":"QuakeCore uses mass- plus initial-stiffness-proportional Rayleigh terms; NIST Perform3D reports 2.5% modal plus 0.5% Rayleigh damping."},"published_reference":{"perform3d":{"T1_s":0.48,"peak_base_shear_kip":27.9,"V_over_W":0.48,"peak_story_drift_percent":[6.07,3.92,1.91],"residual_story1_percent":3.0,"residual_roof_percent":1.9},"measured":{"T1_s":0.34,"peak_base_shear_kip":29.8,"V_over_W":0.51,"peak_story_drift_percent":[5.18,4.7,2.61],"residual_story1_percent":0.3,"residual_roof_percent":0.24}},"mechanism_reference":{"nist_fema_p2018_base_shear_yield_strength_kip":23.3,"governing_mechanism":1,"nist_effective_period_s":0.5,"nist_Sa_at_Te_g":1.8,"hand_first_story_column_flexure_mechanism_kip":25.6407594535,"first_story_column_nominal_moments_kip_in":[149.5210489709,158.5670304304,103.6814508047,88.2252791377],"beam_nominal_moment_kip_in":203.503057066,"panel_zone_exterior_nominal_moment_kip_in":258.1177405759,"panel_zone_interior_nominal_moment_kip_in":344.1569874345,"nonductile_column_reference_shear_kip":8.1743673639,"quakecore_pushover_peak_kip":23.5553100215,"quakecore_dynamic_peak_first_story_end_moment_shear_kip":25.7371390903,"quakecore_dynamic_peak_first_story_component_shear_kip":28.7984107997},"fsc_events":{"A1":{"initiation_step":2231,"initiation_time_s":22.32,"initiation_story1_drift_percent":2.8751099898,"initiation_axial_kip":0.0,"initiation_shear_kip":3.9784366448,"residual_step":2266,"residual_time_s":22.67,"minimum_retained_strength_ratio":0.2},"B1":{"initiation_step":943,"initiation_time_s":9.44,"initiation_story1_drift_percent":2.8036117696,"initiation_axial_kip":21.3847957408,"initiation_shear_kip":10.5317191734,"residual_step":1042,"residual_time_s":10.43,"minimum_retained_strength_ratio":0.2}},"phase8_1_configuration":{"column_flexible_length_in":39.0,"joint_center_story_height_in":48.0,"rigid_offset_each_end_in":4.5,"pdelta_formulation":"constant initial-stress gravity preload; dynamic P(u) geometric update disabled for equilibrium-consistent component P(t)","fsc_shear_spring":true,"independent_shear_force_trigger":false,"post_failure_stiffness_ratio_to_Ke":-0.005,"residual_strength_ratio":0.2,"confined_core_area_ratio_assumed":0.55,"moving_PM_wrapper_enabled":false,"hardening_semantics":"B-C physical tangent referenced to member rotational stiffness; independent of 100x zero-length hinge penalty stiffness"},"solver_invariance":{"status":"PASS","max_roof_history_diff_in":0.0,"relative_roof_history_difference":0.0,"max_sampled_inertial_reaction_history_diff_kip":0.0,"max_sampled_first_story_column_shear_history_diff_kip":0.0,"max_sampled_first_story_component_shear_history_diff_kip":0.0,"same_pattern_seconds":3.424735006,"full_factorization_seconds":6.137766449},"axial_equilibrium":{"max_story1_sum_error_kip":0.0,"min_story1_sum_kip":58.5,"max_story1_sum_kip":58.5},"sensitivity_envelope":{"all_runs_completed":true,"B1_initiates_before_A1_all_runs":true,"tested_parameter_pairs":[[-0.0025,0.1],[-0.0025,0.3],[-0.005,0.2],[-0.01,0.1],[-0.01,0.3]],"peak_inertial_base_reaction_kip_range":[38.5262583082,38.5262583082],"peak_first_story_column_restoring_shear_kip_range":[25.7371390903,25.7371390903],"peak_first_story_component_restoring_shear_kip_range":[28.7984107997,28.7984107997],"peak_story_drift_percent_min":[3.167266079,4.2482242732,2.1600027919],"peak_story_drift_percent_max":[3.5655814053,4.2482242732,2.2056880694],"residual_story1_percent_range":[1.972574466,2.31607221]},"phase8_1_acceptance":{"compiled_and_tested":true,"same_vs_full_direct_invariance_required":true,"static_mechanism_peak_within_2pct_of_nist_P2018_Vy":true,"physical_component_shear_reported_separately_from_inertial_reaction":true,"B1_localizes_before_A1":true,"E_events":2,"F_events":0},"model_progression":{"phase7_fsc_reference":{"legacy_inertial_base_reaction_kip":40.0287228979,"peak_story_drift_percent":[3.337628336,5.0923913562,2.2326354943],"residual_story1_drift_percent":1.1932278462},"phase8_rc1_prior":{"legacy_inertial_base_reaction_kip":40.9998047759},"phase8_1_rc1":{"peak_inertial_base_reaction_kip":38.5262583082,"peak_first_story_column_restoring_shear_kip":25.7371390903,"peak_first_story_component_restoring_shear_kip":28.7984107997,"pushover_peak_base_shear_kip":23.5553100215,"peak_story_drift_percent":[3.27759621,4.2482242732,2.176073734],"residual_story1_drift_percent":2.0780645315,"residual_roof_drift_percent":1.3513228371}},"model_refinements":["physical post-yield hardening tangent decoupled from 100x numerical hinge penalty stiffness","mechanism-comparable first-story column restoring shear separated from inertial reaction and reduced-coordinate generalized force","displacement-controlled static pushover with mechanism/limit-point classification","39-in clear flexible column geometry with 4.5-in rigid offsets","equilibrium-consistent constant-initial-stress P-Delta for component-demand validation","separate flexure-shear-critical series shear springs with local end-rotation, axial-force and shear-dependent initiation","cyclic shear-strength deterioration with explicit residual strength and E tracking","component IDs replace hard-coded recorder offsets"],"input_motion_provenance":"Deterministic 70 s, 1.52g development proxy. It is not the recorded DT1 shake-table waveform. Sa values in this result are for this proxy only.","validation_interpretation":"Phase 8.1 resolves the apparent 41-kip strength discrepancy: the old quantity was an inertial reaction, not the mechanism-comparable first-story restoring shear. With physical hardening semantics, QuakeCore pushover peaks at about 23.6 kip versus the NIST/FEMA P-2018 23.3-kip yield strength, and the dynamic component-recovered first-story restoring shear is about 28.8 kip; the end-moment-only diagnostic is about 25.7 kip. External apples-to-apples DT1 response-history validation remains blocked by the missing recorded table motion and incomplete Perform3D component definitions.","strict_parity_blockers":["Actual recorded Dynamic Test 1 shake-table acceleration history not acquired","Production moving-surface P-M-M return mapping not yet implemented; experimental Phase-8A wrapper remains disabled","Static gravity redistribution after axial-capacity F loss is not yet solved","Exact Perform3D component definitions are not fully available"]};
+let quakecore = normalizeQC(DEFAULT_QC);
+let selectedSource = 'quakecore';
+let targetSource = 'perform3d';
+let exaggeration = 7;
+let showOverlay = true;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const svgNS = 'http://www.w3.org/2000/svg';
+function el(name, attrs={}, parent=null){ const n=document.createElementNS(svgNS,name); Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v)); if(parent) parent.appendChild(n); return n; }
+function fmt(v,d=2){ return (v===null||v===undefined||Number.isNaN(+v))?'—':Number(v).toFixed(d); }
+function sourceData(src){ return src==='quakecore'?quakecore:REF[src]; }
+function displayName(src){ return src==='quakecore'?'QuakeCore':REF[src].short; }
+function otherReference(src){ return src==='measured'?'perform3d':'measured'; }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2300); }
+function relativeError(v,t){ if(v===undefined||v===null||t===0) return null; return 100*(v-t)/t; }
+function envelopeDisplacements(drifts){ let x=0; return drifts.map(d=>x += d/100*(REF.model.drift_height_in||REF.model.story_height_in)); }
+
+function renderKPIs(){
+  const d=sourceData(selectedSource) || REF.perform3d;
+  const roof = d.peak_story_drift_percent ? envelopeDisplacements(d.peak_story_drift_percent).at(-1) : null;
+  const target=REF[targetSource];
+  const items=[
+    ['First-mode period',fmt(d.first_mode_period_s,2)+' s', d.first_mode_period_s!=null?relativeError(d.first_mode_period_s,target.first_mode_period_s):null,'vs '+target.short],
+    ['Peak base shear',fmt(d.peak_base_shear_kip,1)+' kip', d.peak_base_shear_kip!=null?relativeError(d.peak_base_shear_kip,target.peak_base_shear_kip):null,'vs '+target.short],
+    ['Peak base shear / W',fmt(d.peak_base_shear_over_weight ?? (d.peak_base_shear_kip/REF.model.total_weight_kip),2), null,'Total W = 58.5 kip'],
+    ['Envelope-derived roof shift',roof!=null?fmt(roof,2)+' in':'—',null,'Sum of peak drift envelopes']
+  ];
+  $('#kpiGrid').innerHTML=items.map(([lab,val,err,sub])=>`<div class="kpi"><div class="label">${lab}</div><div class="value">${val}${err!=null?`<span class="delta ${Math.abs(err)<=3?'ok':Math.abs(err)<=10?'neutral':'bad'}">${err>=0?'+':''}${fmt(err,1)}%</span>`:''}</div><div class="sub">${sub}</div></div>`).join('');
+}
+
+function renderFrame(){
+  const svg=$('#frameSvg'); svg.innerHTML='';
+  const W=690,H=430, x0=95,yBase=355, bay=142, story=91;
+  // subtle grid
+  for(let i=0;i<4;i++) el('line',{x1:x0+i*bay,y1:50,x2:x0+i*bay,y2:yBase+20,stroke:'#132736','stroke-width':1},svg);
+  for(let j=0;j<4;j++) el('line',{x1:55,y1:yBase-j*story,x2:610,y2:yBase-j*story,stroke:'#132736','stroke-width':1},svg);
+  // story labels
+  for(let j=1;j<=3;j++){ const y=yBase-(j-.5)*story; const t=el('text',{x:62,y:y+4,fill:'#657e90','font-size':10,'text-anchor':'middle'},svg); t.textContent='S'+j; }
+  // base line
+  el('line',{x1:x0-24,y1:yBase+18,x2:x0+3*bay+24,y2:yBase+18,stroke:'#405667','stroke-width':3},svg);
+  // frame members
+  for(let i=0;i<4;i++) el('line',{x1:x0+i*bay,y1:yBase,x2:x0+i*bay,y2:yBase-3*story,stroke:'#718696','stroke-width':5,'stroke-linecap':'round'},svg);
+  for(let j=1;j<=3;j++) el('line',{x1:x0,y1:yBase-j*story,x2:x0+3*bay,y2:yBase-j*story,stroke:'#718696','stroke-width':6,'stroke-linecap':'round'},svg);
+  // fixed bases
+  for(let i=0;i<4;i++){ const x=x0+i*bay; el('path',{d:`M${x-11},${yBase+14} L${x+11},${yBase+14} M${x-8},${yBase+14} L${x-15},${yBase+22} M${x},${yBase+14} L${x-7},${yBase+22} M${x+8},${yBase+14} L${x+1},${yBase+22}`,stroke:'#61798a','stroke-width':1.3,fill:'none'},svg); }
+  // panel zone markers and hinge dots
+  for(let j=1;j<=3;j++) for(let i=0;i<4;i++){
+    const x=x0+i*bay,y=yBase-j*story;
+    el('rect',{x:x-7,y:y-7,width:14,height:14,rx:2,fill:'#0b1720',stroke:'#b68638','stroke-width':1.5,opacity:.9},svg);
+    if(i>0) el('circle',{cx:x-15,cy:y,r:3.2,fill:'#d39e43'},svg);
+    if(i<3) el('circle',{cx:x+15,cy:y,r:3.2,fill:'#d39e43'},svg);
+  }
+  // dimensions
+  el('line',{x1:x0,y1:404,x2:x0+bay,y2:404,stroke:'#3d5669','stroke-width':1},svg); el('line',{x1:x0,y1:399,x2:x0,y2:409,stroke:'#3d5669'},svg); el('line',{x1:x0+bay,y1:399,x2:x0+bay,y2:409,stroke:'#3d5669'},svg);
+  let tx=el('text',{x:x0+bay/2,y:420,fill:'#6f8798','font-size':9,'text-anchor':'middle'},svg);tx.textContent='70 in bay spacing';
+  // deformation layers
+  const current=sourceData(selectedSource) || REF.perform3d;
+  drawEnvelope(svg,current,selectedSource, selectedSource==='measured'?'#f2b84b':selectedSource==='quakecore'?'#75a7ff':'#46d6e4', 3.2, x0,yBase,bay,story);
+  if(showOverlay && selectedSource!=='quakecore'){
+    const o=otherReference(selectedSource); drawEnvelope(svg,REF[o],o, o==='measured'?'#f2b84b':'#46d6e4', 2.0, x0,yBase,bay,story,.62);
+  } else if(showOverlay && selectedSource==='quakecore') {
+    drawEnvelope(svg,REF.perform3d,'perform3d','#46d6e4',1.7,x0,yBase,bay,story,.58);
+    drawEnvelope(svg,REF.measured,'measured','#f2b84b',1.7,x0,yBase,bay,story,.5);
+  }
+  // demand arrow
+  el('path',{d:`M635 ${yBase-1.5*story} L635 ${yBase-1.5*story-42}`,stroke:'#567386','stroke-width':1.4,'marker-end':'url(#none)'},svg);
+  const info=el('text',{x:640,y:88,fill:'#6e8799','font-size':9,'text-anchor':'end'},svg); info.textContent='Envelope shape ×'+exaggeration;
+}
+function drawEnvelope(svg,d,src,color,width,x0,yBase,bay,story,opacity=1){
+  if(!d||!d.peak_story_drift_percent) return;
+  const disp=envelopeDisplacements(d.peak_story_drift_percent);
+  // visual scale map inches to SVG px; story height 48in => 91 px
+  const pxPerIn=story/48;
+  const coords=[{x:x0,y:yBase}];
+  disp.forEach((u,j)=>coords.push({x:x0+u*pxPerIn*exaggeration,y:yBase-(j+1)*story}));
+  const pts=coords.map(p=>`${p.x},${p.y}`).join(' ');
+  el('polyline',{points:pts,fill:'none',stroke:color,'stroke-width':width,'stroke-linejoin':'round','stroke-linecap':'round',opacity},svg);
+  // floor diaphragm lines shifted by cumulative displacement
+  for(let j=1;j<=3;j++){
+    const dx=disp[j-1]*pxPerIn*exaggeration, y=yBase-j*story;
+    el('line',{x1:x0+dx,y1:y,x2:x0+3*bay+dx,y2:y,stroke:color,'stroke-width':src==='quakecore'?2.4:1.7,opacity:opacity*.9,'stroke-dasharray':src==='measured'?'5 4':'none'},svg);
+    el('circle',{cx:x0+dx,cy:y,r:4.5,fill:color,opacity},svg);
+  }
+}
+
+function renderDriftChart(){
+  const svg=$('#driftChart'); svg.innerHTML='';
+  const data=[REF.measured,REF.perform3d]; if(quakecore?.peak_story_drift_percent) data.push({...quakecore,short:'QuakeCore'});
+  const max=Math.max(7,...data.flatMap(d=>d.peak_story_drift_percent||[])); const L=110,R=500,T=30,rowH=70;
+  for(let k=0;k<=4;k++){ const x=L+(R-L)*k/4; el('line',{x1:x,y1:18,x2:x,y2:250,class:'grid-line'},svg); const t=el('text',{x,y:270,class:'chart-label','text-anchor':'middle'},svg); t.textContent=fmt(max*k/4,1)+'%'; }
+  [3,2,1].forEach((story,idx)=>{
+    const y=T+idx*rowH; const lab=el('text',{x:8,y:y+21,class:'chart-title'},svg);lab.textContent='Story '+story;
+    const vals=data.map(d=>({name:d.short||d.name,v:d.peak_story_drift_percent[story-1]}));
+    vals.forEach((o,j)=>{ const yy=y+j*15; const w=(R-L)*o.v/max; const color=o.name==='Measured'?'#f2b84b':o.name==='Perform3D'?'#46d6e4':'#75a7ff'; el('rect',{x:L,y:yy,width:w,height:9,rx:4.5,fill:color,opacity:.9},svg); let text=el('text',{x:L+w+6,y:yy+8,class:'chart-value'},svg); text.textContent=fmt(o.v,2)+'%'; });
+  });
+}
+
+function renderResidualChart(){
+  const svg=$('#residualChart'); svg.innerHTML='';
+  const rows=[['Story 1 residual','residual_story1_drift_percent'],['Roof residual','residual_roof_drift_percent']];
+  const sets=[REF.measured,REF.perform3d]; if(quakecore) sets.push({...quakecore,short:'QuakeCore'});
+  const max=Math.max(3.4,...sets.flatMap(d=>rows.map(r=>+d[r[1]]||0))); const L=130,R=500;
+  for(let k=0;k<=4;k++){ const x=L+(R-L)*k/4; el('line',{x1:x,y1:20,x2:x,y2:232,class:'grid-line'},svg); const t=el('text',{x,y:258,class:'chart-label','text-anchor':'middle'},svg);t.textContent=fmt(max*k/4,1)+'%'; }
+  rows.forEach((r,ri)=>{ const y=48+ri*105; let lab=el('text',{x:5,y:y+20,class:'chart-title'},svg);lab.textContent=r[0]; sets.forEach((d,j)=>{ const v=+d[r[1]]||0, yy=y+j*18,w=(R-L)*v/max,color=(d.short||d.name)==='Measured'?'#f2b84b':(d.short||d.name)==='Perform3D'?'#46d6e4':'#75a7ff';el('rect',{x:L,y:yy,width:w,height:11,rx:5,fill:color},svg);let tx=el('text',{x:L+w+6,y:yy+9,class:'chart-value'},svg);tx.textContent=fmt(v,2)+'%';}); });
+}
+
+function renderShear(){
+  const b=$('#shearBody');
+  const hasQC=quakecore?.peak_story_shear_kip && quakecore.peak_story_shear_kip.length>=3;
+  if(!hasQC){
+    b.innerHTML=`<div class="empty-state"><div><strong>Full story-shear envelope not yet available</strong>Published benchmark manifest contains peak base shear only: <b style="color:#dce9f1">29.8 kip measured</b> and <b style="color:#dce9f1">27.9 kip Perform3D</b>.<br><br>Import a QuakeCore result with <code>peak_inertial_story_reaction_kip</code> to populate this profile. No story-shear values are inferred from peak drift or base shear.</div></div>`;
+    return;
+  }
+  b.innerHTML='<svg id="shearChart" class="chart-svg" viewBox="0 0 520 280"></svg>';
+  const svg=$('#shearChart'), vals=quakecore.peak_story_shear_kip, max=Math.max(...vals,quakecore.peak_base_shear_kip||0)*1.12;
+  const x0=110,x1=490,y0=235,storyH=62; for(let k=0;k<=4;k++){const x=x0+(x1-x0)*k/4;el('line',{x1:x,y1:20,x2:x,y2:245,class:'grid-line'},svg);let t=el('text',{x,y:270,class:'chart-label','text-anchor':'middle'},svg);t.textContent=fmt(max*k/4,1);}
+  const pts=[]; vals.forEach((v,i)=>pts.push(`${x0+(x1-x0)*v/max},${y0-i*storyH}`)); el('polyline',{points:pts.join(' '),fill:'none',stroke:'#75a7ff','stroke-width':3},svg); vals.forEach((v,i)=>{const x=x0+(x1-x0)*v/max,y=y0-i*storyH;el('circle',{cx:x,cy:y,r:5,fill:'#75a7ff'},svg);let l=el('text',{x:5,y:y+4,class:'chart-title'},svg);l.textContent='Story '+(i+1);let t=el('text',{x:x+8,y:y-7,class:'chart-value'},svg);t.textContent=fmt(v,1)+' kip';});
+}
+
+
+function renderAcceleration(){
+  const svg=$('#accelChart'); if(!svg)return; svg.innerHTML='';
+  const vals=quakecore?.peak_floor_acceleration_g;
+  if(!vals||vals.length<3){const t=el('text',{x:260,y:135,class:'chart-label','text-anchor':'middle'},svg);t.textContent='No QuakeCore floor-acceleration profile loaded';return;}
+  const max=Math.max(2,...vals)*1.08,L=110,R=495,T=38,rowH=68;
+  for(let k=0;k<=4;k++){const x=L+(R-L)*k/4;el('line',{x1:x,y1:18,x2:x,y2:235,class:'grid-line'},svg);const t=el('text',{x,y:260,class:'chart-label','text-anchor':'middle'},svg);t.textContent=fmt(max*k/4,1)+' g';}
+  [3,2,1].forEach((floor,idx)=>{const v=vals[floor-1],y=T+idx*rowH,w=(R-L)*v/max;const lab=el('text',{x:8,y:y+14,class:'chart-title'},svg);lab.textContent=floor===3?'Roof':'Floor '+floor;el('rect',{x:L,y,width:w,height:14,rx:7,fill:'#75a7ff'},svg);const tx=el('text',{x:L+w+7,y:y+12,class:'chart-value'},svg);tx.textContent=fmt(v,2)+' g';});
+}
+function renderRunSummary(){
+  const b=$('#runSummary'); if(!b)return;
+  if(!quakecore){b.innerHTML='<div class="empty-state"><div>No QuakeCore result loaded</div></div>';return;}
+  const si=quakecore.solver_invariance||{}, pm=quakecore.proxy_motion||{}, ev=quakecore.fsc_events||{}, push=quakecore.pushover||{}, mr=quakecore.mechanism_reference||{};
+  const refinements=(quakecore.model_refinements||[]).map(x=>`<li>${x}</li>`).join('');
+  b.innerHTML=`<div class="status-card" style="margin-bottom:10px">
+    <div class="status-row"><span>Validation status</span><b style="color:#f2b84b">${quakecore.validation_status||'—'}</b></div>
+    <div class="status-row"><span>Dynamic component restoring shear</span><b>${fmt(quakecore.peak_first_story_component_restoring_shear_kip,2)} kip (${fmt(quakecore.peak_first_story_component_restoring_shear_over_weight,3)}W)</b></div>
+    <div class="status-row"><span>End-moment-only shear diagnostic</span><b>${fmt(quakecore.peak_first_story_column_restoring_shear_kip,2)} kip</b></div>
+    <div class="status-row"><span>Dynamic inertial reaction</span><b>${fmt(quakecore.peak_inertial_base_reaction_kip,2)} kip</b></div>
+    <div class="status-row"><span>Static pushover peak</span><b>${fmt(push.peak_base_shear_kip,2)} kip at ${fmt(push.story1_drift_at_peak_percent,3)}%</b></div>
+    <div class="status-row"><span>NIST/FEMA P-2018 Vy</span><b>${fmt(mr.nist_fema_p2018_base_shear_yield_strength_kip,1)} kip · Mechanism ${mr.governing_mechanism??'—'}</b></div>
+    <div class="status-row"><span>5% Sa near T₁</span><b>Proxy ${fmt(pm.Sa_T0p48_g,2)} g · NIST P-2018 ${fmt(mr.nist_Sa_at_Te_g,2)} g</b></div>
+    <div class="status-row"><span>B1 FSC initiation</span><b>${fmt(ev.B1?.initiation_story1_drift_percent,3)}% · ${fmt(ev.B1?.initiation_shear_kip,2)} kip · P=${fmt(ev.B1?.initiation_axial_kip,2)} kip</b></div>
+  </div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px"><span class="badge good">Full vs SamePattern: ${si.status||'—'}</span><span class="badge good">Pushover mechanism: ${push.mechanism_reached?'reached':'open'}</span><span class="badge info">Axial equilibrium error: ${fmt(quakecore.axial_equilibrium?.max_story1_sum_error_kip,3)} kip</span></div>
+  <div class="callout"><strong>Phase 8.1 refinements:</strong><ul style="margin:6px 0 0 17px;padding:0">${refinements}</ul></div>`;
+}
+function renderHistory(svgId,x,y,unit,color){
+  const svg=$(svgId); if(!svg)return;svg.innerHTML=''; if(!x||!y||x.length<2||y.length!==x.length){const t=el('text',{x:260,y:130,class:'chart-label','text-anchor':'middle'},svg);t.textContent='History not available';return;}
+  const L=58,R=505,T=18,B=225,xmin=x[0],xmax=x[x.length-1],ym=Math.max(1e-12,...y.map(v=>Math.abs(v)))*1.08;
+  for(let k=0;k<=4;k++){const xx=L+(R-L)*k/4;el('line',{x1:xx,y1:T,x2:xx,y2:B,class:'grid-line'},svg);let tx=el('text',{x:xx,y:247,class:'chart-label','text-anchor':'middle'},svg);tx.textContent=fmt(xmin+(xmax-xmin)*k/4,0)+' s';}
+  for(let k=-2;k<=2;k++){const yy=(T+B)/2-(B-T)*k/4;el('line',{x1:L,y1:yy,x2:R,y2:yy,class:k===0?'axis-line':'grid-line'},svg);let ty=el('text',{x:L-7,y:yy+4,class:'chart-label','text-anchor':'end'},svg);ty.textContent=fmt(ym*k/2,1);}
+  const pts=x.map((xx,i)=>{const px=L+(R-L)*(xx-xmin)/(xmax-xmin),py=(T+B)/2-(B-T)*y[i]/(2*ym);return `${px},${py}`}).join(' ');el('polyline',{points:pts,fill:'none',stroke:color,'stroke-width':1.5,opacity:.9},svg);const lab=el('text',{x:L,y:12,class:'chart-label'},svg);lab.textContent='±'+fmt(ym,2)+' '+unit;
+}
+function renderPushover(){
+  const svg=$('#pushoverChart'); if(!svg)return; svg.innerHTML='';
+  const p=quakecore?.pushover, x=p?.story1_drift_percent, y=p?.base_shear_kip;
+  if(!x||!y||x.length<2){const t=el('text',{x:380,y:150,class:'chart-label','text-anchor':'middle'},svg);t.textContent='Pushover history not available';return;}
+  const L=70,R=720,T=25,B=245,xmax=Math.max(3,...x)*1.08,ymax=Math.max(30,...y.map(v=>Math.abs(v)),quakecore?.mechanism_reference?.nist_fema_p2018_base_shear_yield_strength_kip||0)*1.12;
+  for(let k=0;k<=5;k++){const xx=L+(R-L)*k/5;el('line',{x1:xx,y1:T,x2:xx,y2:B,class:'grid-line'},svg);let tx=el('text',{x:xx,y:270,class:'chart-label','text-anchor':'middle'},svg);tx.textContent=fmt(xmax*k/5,1)+'%';}
+  for(let k=0;k<=4;k++){const yy=B-(B-T)*k/4;el('line',{x1:L,y1:yy,x2:R,y2:yy,class:k===0?'axis-line':'grid-line'},svg);let ty=el('text',{x:L-8,y:yy+4,class:'chart-label','text-anchor':'end'},svg);ty.textContent=fmt(ymax*k/4,0);}
+  const pts=x.map((v,i)=>`${L+(R-L)*v/xmax},${B-(B-T)*y[i]/ymax}`).join(' ');el('polyline',{points:pts,fill:'none',stroke:'#75a7ff','stroke-width':2.5},svg);
+  const vy=quakecore?.mechanism_reference?.nist_fema_p2018_base_shear_yield_strength_kip; if(vy!=null){const yy=B-(B-T)*vy/ymax;el('line',{x1:L,y1:yy,x2:R,y2:yy,stroke:'#f2b84b','stroke-width':1.8,'stroke-dasharray':'6 5'},svg);let t=el('text',{x:R-4,y:yy-6,class:'chart-value','text-anchor':'end'},svg);t.textContent='NIST P-2018 Vy = '+fmt(vy,1)+' kip';}
+  const xp=L+(R-L)*(p.story1_drift_at_peak_percent||0)/xmax,yp=B-(B-T)*(p.peak_base_shear_kip||0)/ymax;el('circle',{cx:xp,cy:yp,r:5,fill:'#75a7ff'},svg);let a=el('text',{x:xp+8,y:yp-8,class:'chart-value'},svg);a.textContent=fmt(p.peak_base_shear_kip,2)+' kip @ '+fmt(p.story1_drift_at_peak_percent,3)+'%';
+}
+function renderHistories(){ if(!quakecore)return;renderHistory('#roofHistory',quakecore.time_s,quakecore.roof_displacement_in,'in','#75a7ff');renderHistory('#baseHistory',quakecore.time_s,quakecore.base_shear_kip_history,'kip','#46d6e4'); }
+
+const edpDefs=[
+  ['First-mode period','first_mode_period_s','s',1],
+  ['Peak restoring base shear','peak_base_shear_kip','kip',2],
+  ['Story 1 peak drift','peak_story_drift_percent.0','%',3],
+  ['Story 2 peak drift','peak_story_drift_percent.1','%',3],
+  ['Story 3 peak drift','peak_story_drift_percent.2','%',3],
+  ['Story 1 residual drift','residual_story1_drift_percent','%',5],
+  ['Roof residual drift','residual_roof_drift_percent','%',5]
+];
+function getPath(obj,path){ return path.split('.').reduce((o,k)=>o?.[k],obj); }
+function tolText(name){ if(name.includes('period'))return '≤ 1%'; if(name.includes('base shear'))return '≤ 2%'; if(name.includes('peak drift'))return '≤ 3%'; return '≤ 5% or 0.1 pp'; }
+function renderEDPs(){
+  const target=REF[targetSource];
+  $('#edpRows').innerHTML=edpDefs.map(([name,path,unit,tol])=>{
+    const m=getPath(REF.measured,path), p=getPath(REF.perform3d,path), q=getPath(quakecore,path); let er=q==null?null:relativeError(q,getPath(target,path));
+    let cls=''; if(er!=null){ const a=Math.abs(er); cls=a<=tol?'error-good':a<=tol*2?'error-warn':'error-bad'; }
+    const decimals=unit==='%'?2:unit==='kip'?1:2;
+    return `<tr><td>${name}</td><td class="num">${fmt(m,decimals)} ${unit}</td><td class="num">${fmt(p,decimals)} ${unit}</td><td class="num">${q==null?'—':fmt(q,decimals)+' '+unit}</td><td class="num ${cls}">${er==null?'—':(er>=0?'+':'')+fmt(er,1)+'%'}</td><td class="num">${tolText(name.toLowerCase())}</td></tr>`;
+  }).join('');
+}
+
+function renderChecklist(){
+  const si=quakecore?.solver_invariance||{};
+  const items=[
+    ['Published global targets','NIST Perform3D and measured EDP targets are retained unchanged.','ready'],
+    ['Phase 8.1 mechanism model','39-in clear columns, localized FSC springs, and physical post-yield hardening semantics are active without fitting global EDPs.','ready'],
+    ['Static strength mechanism','QuakeCore pushover peaks at 23.56 kip versus NIST/FEMA P-2018 Vy = 23.3 kip, with all first-story columns yielded before the limit point.','ready'],
+    ['Measured DT1 table acceleration','Strict parity still requires the acceleration actually recorded on the shake table, not the deterministic proxy used here.','blocked'],
+    ['Moving P-M yield surface','Experimental within-trial P-M wrapper remains disabled pending a proper moving-surface/return-mapping formulation.','partial'],
+    ['Gravity redistribution after F','F remains a component state only; static gravity redistribution after axial-capacity loss is not yet implemented.','partial'],
+    ['39-in published drift definition','QuakeCore EDP extraction and FSC clear-column kinematics use the published 39-in clear height.','ready'],
+    ['Direct-solver invariance','FullFactorization and SamePattern histories are identical for Phase 8.1 RC1.',si.status==='PASS'?'ready':'blocked']
+  ];
+  $('#checklist').innerHTML=items.map(([t,d,s])=>`<div class="check"><div class="check-icon">${s==='ready'?'✓':s==='partial'?'↻':'!'}</div><div><div class="title">${t}</div><div class="desc">${d}</div></div><div class="state ${s}">${s}</div></div>`).join('');
+}
+
+function renderProgression(){
+  const tb=$('#progressionRows'); if(!tb)return;
+  const p=quakecore?.model_progression||{};
+  const rows=[
+    ['Phase 8.1 dynamic',p.phase8_1_rc1],
+    ['Phase 8.1 pushover',{peak_first_story_component_restoring_shear_kip:quakecore?.pushover?.peak_base_shear_kip,peak_story_drift_percent:[quakecore?.pushover?.story1_drift_at_peak_percent,null,null]}],
+    ['NIST/FEMA P-2018 mechanism',{peak_first_story_component_restoring_shear_kip:quakecore?.mechanism_reference?.nist_fema_p2018_base_shear_yield_strength_kip}],
+    ['Published Perform3D',REF.perform3d],
+    ['Measured test',REF.measured]
+  ];
+  tb.innerHTML=rows.map(([name,r])=>{ if(!r)return ''; const d=r.peak_story_drift_percent||[]; const v=r.peak_first_story_component_restoring_shear_kip ?? r.peak_first_story_column_restoring_shear_kip ?? r.peak_base_shear_kip; return `<tr><td>${name}</td><td class="num">${fmt(v,1)} kip</td><td class="num">${fmt(d[0],2)}${d[0]!=null?'%':''}</td><td class="num">${fmt(d[1],2)}${d[1]!=null?'%':''}</td><td class="num">${fmt(d[2],2)}${d[2]!=null?'%':''}</td><td class="num">${fmt(r.residual_roof_drift_percent,2)}${r.residual_roof_drift_percent!=null?'%':''}</td></tr>`; }).join('');
+}
+function renderLabels(){
+  $('#sourceBadge').textContent=displayName(selectedSource); $('#legendSelected').textContent=displayName(selectedSource)+' envelope';
+  const ov=selectedSource==='quakecore'?'Perform3D + measured':displayName(otherReference(selectedSource)); $('#legendOverlay').textContent=ov+' envelope';
+}
+function renderAll(){ renderKPIs();renderLabels();renderProgression();renderFrame();renderDriftChart();renderResidualChart();renderShear();renderAcceleration();renderRunSummary();renderHistories();renderPushover();renderEDPs();renderChecklist(); const a=$('#qcDriftLegend'),b=$('#qcResidualLegend'); if(a)a.style.display=quakecore?'inline':'none'; if(b)b.style.display=quakecore?'inline':'none'; }
+
+$$('#sourceSeg button').forEach(b=>b.addEventListener('click',()=>{ if(b.disabled)return; selectedSource=b.dataset.source; $$('#sourceSeg button').forEach(x=>x.classList.toggle('active',x===b)); renderAll(); }));
+$$('#targetSeg button').forEach(b=>b.addEventListener('click',()=>{targetSource=b.dataset.target; $$('#targetSeg button').forEach(x=>x.classList.toggle('active',x===b));renderKPIs();renderEDPs();}));
+$('#exag').addEventListener('input',e=>{exaggeration=+e.target.value;$('#exagVal').textContent=exaggeration+'×';renderFrame();});
+$('#overlay').addEventListener('change',e=>{showOverlay=e.target.checked;renderFrame();});
+
+function normalizeQC(raw){
+  const q={...raw};
+  if(q.peak_story_drift_percent && !Array.isArray(q.peak_story_drift_percent)) throw new Error('peak_story_drift_percent must be an array');
+  // Benchmark-facing base shear is the physical first-story restoring shear.
+  // Inertial reaction remains available under its explicit field name.
+  if(q.peak_first_story_component_restoring_shear_kip!=null) q.peak_base_shear_kip=q.peak_first_story_component_restoring_shear_kip; else if(q.peak_first_story_column_restoring_shear_kip!=null) q.peak_base_shear_kip=q.peak_first_story_column_restoring_shear_kip;
+  if(q.peak_base_shear_kip!=null) q.peak_base_shear_over_weight=q.peak_base_shear_kip/REF.model.total_weight_kip;
+  if(q.first_story_component_restoring_shear_kip_history) q.base_shear_kip_history=q.first_story_component_restoring_shear_kip_history; else if(q.first_story_column_restoring_shear_kip_history) q.base_shear_kip_history=q.first_story_column_restoring_shear_kip_history;
+  if(q.peak_inertial_story_reaction_kip) q.peak_story_shear_kip=q.peak_inertial_story_reaction_kip;
+  return q;
+}
+$('#fileInput').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  try{ const raw=JSON.parse(await f.text()); quakecore=normalizeQC(raw); $('#qcSourceBtn').disabled=false; $('#sideQC').textContent='Loaded'; selectedSource='quakecore'; $$('#sourceSeg button').forEach(x=>x.classList.toggle('active',x.dataset.source==='quakecore')); renderAll(); toast('QuakeCore result loaded'); }
+  catch(err){ toast('Could not load JSON: '+err.message); }
+  e.target.value='';
+});
+$('#resetBtn').addEventListener('click',()=>{quakecore={...DEFAULT_QC};selectedSource='quakecore';targetSource='perform3d';$('#qcSourceBtn').disabled=false;$('#sideQC').textContent='Phase 8.1 RC1 loaded'; $$('#sourceSeg button').forEach(x=>x.classList.toggle('active',x.dataset.source==='quakecore')); $$('#targetSeg button').forEach(x=>x.classList.toggle('active',x.dataset.target==='perform3d'));renderAll();toast('Embedded QuakeCore run restored');});
+$('#exportBtn').addEventListener('click',()=>{
+  const payload={benchmark_id:'nist_gcr_22_917_50_uc_berkeley_3story_dt1',reference:{measured:REF.measured,perform3d:REF.perform3d},quakecore};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='uc_berkeley_3story_validation_view.json';a.click();URL.revokeObjectURL(a.href);toast('Current data exported');
+});
+
+$('#schemaText').textContent=`{
+  "first_mode_period_s": 0.48,
+  "peak_first_story_component_restoring_shear_kip": 28.8,
+  "peak_first_story_column_restoring_shear_kip": 25.7,
+  "peak_inertial_base_reaction_kip": 38.5,
+  "peak_story_drift_percent": [6.07, 3.92, 1.91],
+  "residual_story1_drift_percent": 3.0,
+  "residual_roof_drift_percent": 1.9,
+
+  "peak_inertial_story_reaction_kip": [/* optional S1,S2,S3 */],
+  "peak_floor_acceleration_g": [/* optional F1,F2,Roof */],
+  "story_drift_height_in": 39,
+  "solver": "same_pattern",
+  "elapsed_s": 0.0,
+  "newton_iterations": 0,
+  "input_motion_provenance": "..."
+}`;
+renderAll();
+</script>
+</body>
+</html>
