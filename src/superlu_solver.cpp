@@ -126,16 +126,16 @@ static void validate_same_pattern(const SparseMatrixCSC& matrix,
     }
 }
 
-static std::vector<double> dgssvx_factor_solve(SuperLUSamePatternSolver::Impl& impl,
-                                               const SparseMatrixCSC& matrix,
-                                               const std::vector<double>& rhs,
-                                               fact_t fact_mode) {
+static std::vector<double> factor_same_pattern_and_solve(SuperLUSamePatternSolver::Impl& impl,
+                                                         const SparseMatrixCSC& matrix,
+                                                         const std::vector<double>& rhs,
+                                                         fact_t fact_mode) {
     if (static_cast<int>(rhs.size()) != impl.n) throw std::invalid_argument("SuperLU RHS dimension mismatch");
 
-    // SuperLU's SamePattern mode reuses only the column permutation and
-    // elimination tree. It produces a new L/U factorization. Destroy the
-    // previous factors before the call so their stores are not overwritten
-    // and leaked. SamePattern_SameRowPerm is the mode that reuses L/U storage.
+    // SamePattern reuses the column permutation and elimination tree, but it
+    // creates a new L/U factorization. Retire the preceding factor stores
+    // before refactorization; SamePattern_SameRowPerm is the mode that reuses
+    // L/U storage.
     if (fact_mode == SamePattern && impl.factored) impl.destroy_factors();
 
     std::vector<double> avals=matrix.values();
@@ -143,34 +143,45 @@ static std::vector<double> dgssvx_factor_solve(SuperLUSamePatternSolver::Impl& i
     std::vector<int> cols=matrix.col_ptr();
     SuperMatrix A{};
     dCreate_CompCol_Matrix(&A,impl.n,impl.n,matrix.nnz(),avals.data(),rows.data(),cols.data(),SLU_NC,SLU_D,SLU_GE);
-    std::vector<double> b=rhs, x(static_cast<std::size_t>(impl.n),0.0);
-    SuperMatrix B{}, X{};
-    dCreate_Dense_Matrix(&B,impl.n,1,b.data(),impl.n,SLU_DN,SLU_D,SLU_GE);
-    dCreate_Dense_Matrix(&X,impl.n,1,x.data(),impl.n,SLU_DN,SLU_D,SLU_GE);
 
-    superlu_options_t options; set_default_options(&options);
+    superlu_options_t options;
+    set_default_options(&options);
     options.Fact=fact_mode;
     options.PrintStat=NO;
-    // Disable equilibration so solve_current() can use dgstrs directly on the
-    // retained factors without an additional scaling/unscaling stage.
     options.Equil=NO;
-    SuperLUStat_t stat; StatInit(&stat);
+    if(fact_mode==DOFACT)get_perm_c(options.ColPerm,&A,impl.perm_c.data());
+
+    // dgssvx() returns early on an exactly singular factorization before it
+    // destroys the temporary matrix created by sp_preorder(). Own this layer
+    // directly so every path, including singular recovery tests, releases AC.
+    SuperMatrix AC{};
+    sp_preorder(&options,&A,impl.perm_c.data(),impl.etree.data(),&AC);
+    SuperLUStat_t stat;
+    StatInit(&stat);
     int_t info=0;
-    double rpg=0.0,rcond=0.0,ferr=0.0,berr=0.0;
-    mem_usage_t mem_usage{};
-    dgssvx(&options,&A,impl.perm_c.data(),impl.perm_r.data(),impl.etree.data(),
-           impl.equed,impl.R.data(),impl.C.data(),&impl.L,&impl.U,
-           nullptr,0,&B,&X,&rpg,&rcond,&ferr,&berr,&impl.Glu,&mem_usage,&stat,&info);
+    dgstrf(&options,&AC,sp_ienv(2),sp_ienv(1),impl.etree.data(),nullptr,0,
+           impl.perm_c.data(),impl.perm_r.data(),&impl.L,&impl.U,&impl.Glu,&stat,&info);
     StatFree(&stat);
+    Destroy_CompCol_Permuted(&AC);
     Destroy_SuperMatrix_Store(&A);
-    Destroy_SuperMatrix_Store(&B);
-    Destroy_SuperMatrix_Store(&X);
-    if(info!=0 && info!=impl.n+1){
+
+    if(info!=0){
         impl.destroy_factors();
-        throw std::runtime_error("SuperLU same-pattern factor/solve failed, info="+std::to_string(info));
+        throw std::runtime_error("SuperLU same-pattern factorization failed, info="+std::to_string(info));
     }
+
     impl.factored=true;
     ++impl.factorization_count;
+
+    std::vector<double> x=rhs;
+    SuperMatrix B{};
+    dCreate_Dense_Matrix(&B,impl.n,1,x.data(),impl.n,SLU_DN,SLU_D,SLU_GE);
+    StatInit(&stat);
+    info=0;
+    dgstrs(NOTRANS,&impl.L,&impl.U,impl.perm_c.data(),impl.perm_r.data(),&B,&stat,&info);
+    StatFree(&stat);
+    Destroy_SuperMatrix_Store(&B);
+    if(info!=0)throw std::runtime_error("SuperLU same-pattern triangular solve failed, info="+std::to_string(info));
     return x;
 }
 
@@ -186,7 +197,7 @@ SuperLUSamePatternSolver::SuperLUSamePatternSolver(const SparseMatrixCSC& initia
     impl_->R.resize(static_cast<std::size_t>(impl_->n));
     impl_->C.resize(static_cast<std::size_t>(impl_->n));
     std::vector<double> zero(static_cast<std::size_t>(impl_->n),0.0);
-    (void)dgssvx_factor_solve(*impl_,initial_matrix,zero,DOFACT);
+    (void)factor_same_pattern_and_solve(*impl_,initial_matrix,zero,DOFACT);
 }
 SuperLUSamePatternSolver::~SuperLUSamePatternSolver()=default;
 SuperLUSamePatternSolver::SuperLUSamePatternSolver(SuperLUSamePatternSolver&&) noexcept=default;
@@ -210,7 +221,7 @@ std::vector<double> SuperLUSamePatternSolver::solve_current(const std::vector<do
 std::vector<double> SuperLUSamePatternSolver::refactor_and_solve(const SparseMatrixCSC& matrix,
                                                                   const std::vector<double>& rhs) {
     validate_same_pattern(matrix,*impl_);
-    return dgssvx_factor_solve(*impl_,matrix,rhs,impl_->factored?SamePattern:DOFACT);
+    return factor_same_pattern_and_solve(*impl_,matrix,rhs,impl_->factored?SamePattern:DOFACT);
 }
 
 std::vector<double> superlu_solve_once(const SparseMatrixCSC& matrix,
