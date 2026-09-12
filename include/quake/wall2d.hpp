@@ -50,6 +50,7 @@ public:
 private:
     double h_{},c_{},total_mass_{};
     int state_size_{};
+    int shear_offset_{-1};
     std::variant<MVLEMProperties,SFIMVLEMProperties> properties_;
     std::vector<double> x_;
     std::vector<int> offsets_;
