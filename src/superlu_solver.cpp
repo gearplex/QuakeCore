@@ -106,10 +106,16 @@ struct SuperLUSamePatternSolver::Impl {
     bool factored{false};
     std::size_t factorization_count{0};
 
-    ~Impl() {
+    void destroy_factors() noexcept {
         if (L.Store) Destroy_SuperNode_Matrix(&L);
         if (U.Store) Destroy_CompCol_Matrix(&U);
+        L = {};
+        U = {};
+        Glu = {};
+        factored = false;
     }
+
+    ~Impl() { destroy_factors(); }
 };
 
 static void validate_same_pattern(const SparseMatrixCSC& matrix,
@@ -125,6 +131,13 @@ static std::vector<double> dgssvx_factor_solve(SuperLUSamePatternSolver::Impl& i
                                                const std::vector<double>& rhs,
                                                fact_t fact_mode) {
     if (static_cast<int>(rhs.size()) != impl.n) throw std::invalid_argument("SuperLU RHS dimension mismatch");
+
+    // SuperLU's SamePattern mode reuses only the column permutation and
+    // elimination tree. It produces a new L/U factorization. Destroy the
+    // previous factors before the call so their stores are not overwritten
+    // and leaked. SamePattern_SameRowPerm is the mode that reuses L/U storage.
+    if (fact_mode == SamePattern && impl.factored) impl.destroy_factors();
+
     std::vector<double> avals=matrix.values();
     std::vector<int> rows=matrix.row_ind();
     std::vector<int> cols=matrix.col_ptr();
@@ -153,9 +166,7 @@ static std::vector<double> dgssvx_factor_solve(SuperLUSamePatternSolver::Impl& i
     Destroy_SuperMatrix_Store(&B);
     Destroy_SuperMatrix_Store(&X);
     if(info!=0 && info!=impl.n+1){
-        if(impl.L.Store)Destroy_SuperNode_Matrix(&impl.L);
-        if(impl.U.Store)Destroy_CompCol_Matrix(&impl.U);
-        impl.L={};impl.U={};impl.Glu={};impl.factored=false;
+        impl.destroy_factors();
         throw std::runtime_error("SuperLU same-pattern factor/solve failed, info="+std::to_string(info));
     }
     impl.factored=true;
