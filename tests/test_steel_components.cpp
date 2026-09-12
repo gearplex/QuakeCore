@@ -111,9 +111,9 @@ int main(){try{
                    p[1].deformation=.05;Pinching4Envelope bad({p,n});});
     }
 
-    // Gate 4: first stateful Pinching4 reversal, through the first return to
-    // the negative envelope (frozen steel_raw steps 0-80). The next reversal
-    // is intentionally rejected until state 4 is independently admitted.
+    // Gate 4: first Pinching4 positive-to-negative and negative-to-positive
+    // transitions, through positive-envelope re-entry (frozen steel_raw
+    // steps 0-120). The next reversal is intentionally rejected.
     {
         auto m=yori_steel_pinching4();
         auto state=m.initial_state();
@@ -122,32 +122,45 @@ int main(){try{
         for(int i=1;i<=20;++i)protocol.push_back(0.001+(0.004-0.001)*i/20.0);
         for(int i=1;i<=20;++i)protocol.push_back(0.004*(1.0-i/20.0));
         for(int i=1;i<=20;++i)protocol.push_back(-0.004*i/20.0);
+        for(int i=1;i<=20;++i)protocol.push_back(-0.004*(1.0-i/20.0));
+        for(int i=1;i<=20;++i)protocol.push_back(0.012*i/20.0);
         struct Point{int step;double force;double tangent;double work;Pinching4StateKind kind;};
         const Point points[]={{40,62.22999770316504,1450.0018973854026,0.1795242523682835,Pinching4StateKind::PositiveEnvelope},
             {41,56.430009420313084,28999.941414259767,0.1676582516559357,Pinching4StateKind::PositiveToNegative},
             {56,-30.45630604728855,13311.117376641287,0.12885660888164763,Pinching4StateKind::PositiveToNegative},
             {67,-59.131915014958025,662.3850364545071,0.22801250131106024,Pinching4StateKind::PositiveToNegative},
             {72,-59.90999466734839,1450.0018973854026,0.28748717830583914,Pinching4StateKind::NegativeEnvelope},
-            {80,-62.22999770316503,1450.0018973854026,0.3851991722022499,Pinching4StateKind::NegativeEnvelope}};
+            {80,-62.22999770316503,1450.0018973854026,0.3851991722022499,Pinching4StateKind::NegativeEnvelope},
+            {81,-56.43000942031308,28999.941414259767,0.3733331714899021,Pinching4StateKind::NegativeToPositive},
+            {95,24.769826539614265,28999.941414259767,0.32900891545692373,Pinching4StateKind::NegativeToPositive},
+            {96,30.426787354277263,9231.136954424634,0.3345285768463129,Pinching4StateKind::NegativeToPositive},
+            {104,59.96642560843609,9231.136954424634,0.4791577175866542,Pinching4StateKind::NegativeToPositive},
+            {105,62.31037347435234,356.87499126204204,0.5158407573114907,Pinching4StateKind::NegativeToPositive},
+            {107,62.73862346386679,356.87499126204204,0.5908701554744222,Pinching4StateKind::NegativeToPositive},
+            {108,63.38999922107336,1450.0018973854026,0.6287087422799043,Pinching4StateKind::PositiveEnvelope},
+            {112,66.68955359846188,204.05715985559664,0.7849666108220494,Pinching4StateKind::PositiveEnvelope},
+            {120,67.66902796576875,204.05715985559664,1.1074272065762027,Pinching4StateKind::PositiveEnvelope}};
         double work=0.0,previous_force=0.0,previous_deformation=0.0;
-        for(int step=0;step<=80;++step){
+        for(int step=0;step<=120;++step){
             const double deformation=protocol[static_cast<std::size_t>(step)];
-            if(step==41){
+            if(step==41||step==81){
                 const auto a=m.trial(deformation,state),b=m.trial(deformation,state);
                 near(a.response.force,b.response.force,1e-13,"Pinching4 trial purity");
-                check(state.kind==Pinching4StateKind::PositiveEnvelope,"Pinching4 trial mutated committed state");
+                const auto expected=step==41?Pinching4StateKind::PositiveEnvelope:Pinching4StateKind::NegativeEnvelope;
+                check(state.kind==expected,"Pinching4 trial mutated committed state");
             }
             const auto trial=m.trial(deformation,state);
             if(step>0)work+=0.5*(previous_force+trial.response.force)*(deformation-previous_deformation);
             for(const auto& point:points)if(point.step==step){
-                near(trial.response.force,point.force,1e-11,"Pinching4 first-cycle force oracle");
-                near(trial.response.tangent,point.tangent,1e-11,"Pinching4 first-cycle tangent oracle");
-                near(work,point.work,1e-10,"Pinching4 first-cycle work oracle");
-                check(trial.state.kind==point.kind,"Pinching4 first-cycle state mismatch");
+                near(trial.response.force,point.force,1e-11,"Pinching4 cyclic force oracle");
+                near(trial.response.tangent,point.tangent,1e-11,"Pinching4 cyclic tangent oracle");
+                near(work,point.work,1e-10,"Pinching4 cyclic work oracle");
+                check(trial.state.kind==point.kind,"Pinching4 cyclic state mismatch");
             }
             previous_force=trial.response.force;previous_deformation=deformation;state=trial.state;
         }
-        rejects([&]{(void)m.trial(-0.0038,state);});
+        check(state.reversal_count==2,"Pinching4 reversal history mismatch");
+        rejects([&]{(void)m.trial(0.0108,state);});
     }
 
     // Rigid translation and rigid rotation must not create member force.
@@ -219,6 +232,6 @@ int main(){try{
         check(a.termination==AnalysisTermination::Completed&&b2.termination==AnalysisTermination::Completed,"nonlinear damper NRHA failed");
         near(a.final_displacement[0],b2.final_displacement[0],2e-11,"nonlinear damper solver mismatch");
     }
-    std::cout<<"steel members, Pinching4 first cycle, panel zones, BRBs, viscous dampers, rollback, Jacobians, and NRHA checks passed\n";
+    std::cout<<"steel members, Pinching4 first two reversals, panel zones, BRBs, viscous dampers, rollback, Jacobians, and NRHA checks passed\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
