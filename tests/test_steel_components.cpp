@@ -1,5 +1,6 @@
 #include "quake/frame2d.hpp"
 #include "quake/newmark.hpp"
+#include "quake/pinching4.hpp"
 #include "quake/steel2d.hpp"
 #include "quake/superlu_solver.hpp"
 
@@ -19,6 +20,22 @@ void near(double x,double y,double tol,const char* why){
     check(std::isfinite(x)&&std::isfinite(y)&&std::abs(x-y)<=tol*std::max({1.0,std::abs(x),std::abs(y)}),why);
 }
 template<class F>void rejects(F f){bool bad=false;try{f();}catch(const std::exception&){bad=true;}check(bad,"invalid steel component was accepted");}
+
+Pinching4Envelope yori_steel_pinching4_envelope(){
+    // Recovered from the frozen OpenSees 3.8.0 story-1 runtime oracle by
+    // intersecting consecutive piecewise-linear envelope segments. The
+    // original source model input is not committed in this repository.
+    std::array<Pinching4Point,4> p{{
+        {0.00204828,59.4},{0.00705517,66.66},{0.0523366,75.9},{0.0654208,33.0}}};
+    std::array<Pinching4Point,4> n{{
+        {-0.00204828,-59.4},{-0.00705517,-66.66},{-0.0523366,-75.9},{-0.0654208,-33.0}}};
+    return Pinching4Envelope({p,n});
+}
+void pinching4_near(const Pinching4Envelope& m,double d,double f,double k){
+    auto r=m.response(d);
+    near(r.force,f,1e-11,"Pinching4 steel envelope force oracle");
+    near(r.tangent,k,1e-11,"Pinching4 steel envelope tangent oracle");
+}
 
 SteelMember2DProperties steel(double k=2.0e8,double fy=2.5e5,double b=.02){
     SteelMember2DProperties p;p.E=2.0e8;p.A=.02;p.I=8.0e-4;
@@ -53,6 +70,31 @@ int main(){try{
     rejects([]{auto p=steel();p.E=0;SteelMember2D e(0,0,3,0,p);});
     rejects([]{ViscousDamper2D d({10,.5,0});});
     rejects([]{ViscousDamper2D d({-1,1,0});});
+
+    // Gate 4: OpenSees Pinching4 envelope construction for the frozen YORi
+    // story-1 reinforcing-steel material. This deliberately verifies only
+    // envelope geometry; cyclic pinching and damage states remain separate.
+    {
+        auto m=yori_steel_pinching4_envelope();
+        pinching4_near(m,0.0,0.0,28999.941414259767);
+        pinching4_near(m,0.001,28.99994141425977,28999.941414259767);
+        pinching4_near(m,0.0019,55.09988868709357,28999.941414259767);
+        pinching4_near(m,0.00205,59.4024940032635,1450.0018973854026);
+        pinching4_near(m,0.004,62.22999770316504,1450.0018973854026);
+        pinching4_near(m,0.0072,66.68955359846188,204.05715985559664);
+        pinching4_near(m,0.035,72.36234264244747,204.05715985559664);
+        pinching4_near(m,0.0505,75.52522862020922,204.05715985559664);
+        pinching4_near(m,0.05525,66.34764983720825,-3278.763699729444);
+        pinching4_near(m,0.060,50.77352226349338,-3278.763699729444);
+        pinching4_near(m,0.066,33.00000002921642,5.0442723109520276e-05);
+        pinching4_near(m,0.080,33.000000735414545,5.0442723109520276e-05);
+        pinching4_near(m,-0.004,-62.22999770316504,1450.0018973854026);
+        pinching4_near(m,-0.060,-50.77352226349338,-3278.763699729444);
+        pinching4_near(m,-0.080,-33.000000735414545,5.0442723109520276e-05);
+        rejects([]{std::array<Pinching4Point,4> p{{{.1,1},{.2,2},{.3,3},{.4,4}}};
+                   std::array<Pinching4Point,4> n{{{-.1,-1},{-.2,-2},{-.3,-3},{-.4,-4}}};
+                   p[1].deformation=.05;Pinching4Envelope bad({p,n});});
+    }
 
     // Rigid translation and rigid rotation must not create member force.
     SteelMember2D e(1.2,-.5,4.0,2.3,steel());auto s=e.initial_state();
@@ -123,6 +165,6 @@ int main(){try{
         check(a.termination==AnalysisTermination::Completed&&b2.termination==AnalysisTermination::Completed,"nonlinear damper NRHA failed");
         near(a.final_displacement[0],b2.final_displacement[0],2e-11,"nonlinear damper solver mismatch");
     }
-    std::cout<<"steel members, panel zones, BRBs, viscous dampers, rollback, Jacobians, and NRHA checks passed\n";
+    std::cout<<"steel members, Pinching4 envelope, panel zones, BRBs, viscous dampers, rollback, Jacobians, and NRHA checks passed\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
