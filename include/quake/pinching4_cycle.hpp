@@ -1,5 +1,6 @@
 #pragma once
 #include "quake/pinching4.hpp"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <stdexcept>
@@ -35,7 +36,7 @@ public:
         for(double x:p_.gamma_f)if(x!=0.0)throw std::invalid_argument("Pinching4 first-cycle slice requires zero gammaF");
     }
     Pinching4State initial_state()const{
-        Pinching4State s;const auto&p=env_.positive_points();const auto&n=env_.negative_points();
+        Pinching4State s;const auto p=positive_points();const auto n=negative_points();
         s.tangent=env_.positive_elastic_tangent();s.low_state_deformation=n[0].deformation;s.low_state_force=n[0].force;
         s.high_state_deformation=p[0].deformation;s.high_state_force=p[0].force;s.min_demand=n[1].deformation;s.max_demand=p[1].deformation;
         s.damaged_min=s.min_demand;s.damaged_max=s.max_demand;return s;
@@ -56,8 +57,19 @@ public:
         t.damaged_max=t.max_demand*(1.0+t.gamma_d);t.damaged_min=t.min_demand*(1.0+t.gamma_d);return{r,t};
     }
 private:
+    std::array<Pinching4Point,6> positive_points()const{return envelope_points(true);}
+    std::array<Pinching4Point,6> negative_points()const{return envelope_points(false);}
+    std::array<Pinching4Point,6> envelope_points(bool positive)const{
+        std::array<Pinching4Point,6> q{};const auto& src=positive?p_.envelope.positive:p_.envelope.negative;
+        const double kp=p_.envelope.positive[0].force/p_.envelope.positive[0].deformation;
+        const double kn=p_.envelope.negative[0].force/p_.envelope.negative[0].deformation;
+        const double k=std::max(kp,kn),u=std::max(p_.envelope.positive[0].deformation,-p_.envelope.negative[0].deformation)*1.0e-4;
+        q[0]=positive?Pinching4Point{u,u*k}:Pinching4Point{-u,-u*k};for(std::size_t i=0;i<4;++i)q[i+1]=src[i];
+        const double last=slope(src[2],src[3]);q[5].deformation=1.0e6*src[3].deformation;
+        q[5].force=last>0.0?src[3].force+last*(q[5].deformation-src[3].deformation):1.1*src[3].force;return q;
+    }
     void update_state(double u,double du,const Pinching4State&c,Pinching4State&t)const{
-        const auto&p=env_.positive_points();const auto&n=env_.negative_points();
+        const auto p=positive_points();const auto n=negative_points();
         if(t.kind==Pinching4StateKind::Initial){
             if(u>t.high_state_deformation){t.kind=Pinching4StateKind::PositiveEnvelope;t.low_state_deformation=p[0].deformation;t.low_state_force=p[0].force;t.high_state_deformation=p[5].deformation;t.high_state_force=p[5].force;}
             else if(u<t.low_state_deformation){t.kind=Pinching4StateKind::NegativeEnvelope;t.low_state_deformation=n[5].deformation;t.low_state_force=n[5].force;t.high_state_deformation=n[0].deformation;t.high_state_force=n[0].force;}
@@ -65,30 +77,26 @@ private:
         if(t.kind==Pinching4StateKind::PositiveEnvelope&&du<0.0){
             if(c.deformation>t.max_demand)t.max_demand=c.deformation;
             if(t.max_demand<t.damaged_max)t.max_demand=t.damaged_max;
-            if(u<t.damaged_min){to_negative_envelope(t);}
-            else{t.kind=Pinching4StateKind::PositiveToNegative;t.low_state_deformation=t.damaged_min;t.low_state_force=env_.negative(t.damaged_min).force;t.high_state_deformation=c.deformation;t.high_state_force=c.force;}return;}
+            if(u<t.damaged_min){to_negative_envelope(t);}else{t.kind=Pinching4StateKind::PositiveToNegative;t.low_state_deformation=t.damaged_min;t.low_state_force=env_.negative(t.damaged_min).force;t.high_state_deformation=c.deformation;t.high_state_force=c.force;}return;}
         if(t.kind==Pinching4StateKind::PositiveToNegative){if(u<t.low_state_deformation)to_negative_envelope(t);else if(du>0.0)throw std::logic_error("Pinching4 reversal from state 3 is not yet admitted in Gate 4");return;}
         if(t.kind==Pinching4StateKind::NegativeEnvelope&&du>0.0)throw std::logic_error("Pinching4 negative-to-positive reversal is not yet admitted in Gate 4");
     }
-    void to_negative_envelope(Pinching4State&t)const{const auto&n=env_.negative_points();t.kind=Pinching4StateKind::NegativeEnvelope;t.low_state_deformation=n[5].deformation;t.low_state_force=n[5].force;t.high_state_deformation=n[0].deformation;t.high_state_force=n[0].force;}
+    void to_negative_envelope(Pinching4State&t)const{const auto n=negative_points();t.kind=Pinching4StateKind::NegativeEnvelope;t.low_state_deformation=n[5].deformation;t.low_state_force=n[5].force;t.high_state_deformation=n[0].deformation;t.high_state_force=n[0].force;}
     Pinching4Response state3(const Pinching4State&s,double u)const{
         std::array<Pinching4Point,4>q{};q[0]={s.low_state_deformation,s.low_state_force};q[3]={s.high_state_deformation,s.high_state_force};
         const double kunload=q[3].deformation<0.0?env_.negative_elastic_tangent():env_.positive_elastic_tangent();const double kmax=std::max(kunload,env_.negative_elastic_tangent());
         if(q[0].deformation*q[3].deformation>=0.0)linear(q);else{
-            q[1].deformation=q[0].deformation*p_.r_disp_negative;
-            if(p_.r_force_negative-p_.u_force_negative<=1e-8)throw std::logic_error("Pinching4 alternate state-3 force branch is not yet admitted");
-            q[1].force=q[0].force*p_.r_force_negative;
-            if(slope(q[0],q[1])>env_.negative_elastic_tangent())q[1].deformation=q[0].deformation+(q[1].force-q[0].force)/env_.negative_elastic_tangent();
-            if(q[1].deformation>q[3].deformation)linear(q);else{const auto&n=env_.negative_points();q[2].force=p_.u_force_negative*(s.min_demand<n[3].deformation?n[4].force:n[3].force);q[2].deformation=q[3].deformation-(q[3].force-q[2].force)/kunload;
+            q[1].deformation=q[0].deformation*p_.r_disp_negative;if(p_.r_force_negative-p_.u_force_negative<=1e-8)throw std::logic_error("Pinching4 alternate state-3 force branch is not yet admitted");
+            q[1].force=q[0].force*p_.r_force_negative;if(slope(q[0],q[1])>env_.negative_elastic_tangent())q[1].deformation=q[0].deformation+(q[1].force-q[0].force)/env_.negative_elastic_tangent();
+            if(q[1].deformation>q[3].deformation)linear(q);else{const auto n=negative_points();q[2].force=p_.u_force_negative*(s.min_demand<n[3].deformation?n[4].force:n[3].force);q[2].deformation=q[3].deformation-(q[3].force-q[2].force)/kunload;
                 if(q[2].deformation>q[3].deformation)midpoint(q);else if(slope(q[1],q[2])>kmax)linear(q);else if(q[2].deformation<q[1].deformation||slope(q[1],q[2])<0.0)throw std::logic_error("Pinching4 alternate state-3 ordering branch is not yet admitted");}}
-        for(std::size_t i=0;i<3;++i){if(u>=q[i].deformation&&(i==2||u<q[i+1].deformation))return interp(u,q[i],q[i+1]);}
-        return interp(u,q[0],q[1]);
+        for(std::size_t i=0;i<3;++i){if(u>=q[i].deformation&&(i==2||u<q[i+1].deformation))return interp(u,q[i],q[i+1]);}return interp(u,q[0],q[1]);
     }
     void update_damage(Pinching4State&s,double u,double du,double elastic)const{
-        const double umax=std::max(s.max_demand,-s.min_demand),uult=std::max(env_.positive_points()[4].deformation,-env_.negative_points()[4].deformation);s.cycles+=std::abs(du)/(4.0*umax);
+        const auto p=positive_points();const auto n=negative_points();const double umax=std::max(s.max_demand,-s.min_demand),uult=std::max(p[4].deformation,-n[4].deformation);s.cycles+=std::abs(du)/(4.0*umax);
         if(u<uult&&u>-uult&&s.energy<energy_capacity()){s.gamma_d=p_.gamma_d[0]*std::pow(umax/uult,p_.gamma_d[2]);if(s.energy>elastic&&p_.damage_mode==Pinching4DamageMode::Energy){double e=(s.energy-elastic)/energy_capacity();s.gamma_d+=p_.gamma_d[1]*std::pow(e,p_.gamma_d[3]);}else if(p_.damage_mode==Pinching4DamageMode::Cycle)s.gamma_d+=p_.gamma_d[1]*std::pow(s.cycles,p_.gamma_d[3]);s.gamma_d=std::min(s.gamma_d,p_.gamma_d_limit);}else if(u<uult&&u>-uult)s.gamma_d=p_.gamma_d_limit;
     }
-    double energy_capacity()const{const auto&p=env_.positive_points();const auto&n=env_.negative_points();double ep=.5*p[0].deformation*p[0].force,en=.5*n[0].deformation*n[0].force;for(std::size_t i=0;i<4;++i){ep+=.5*(p[i].force+p[i+1].force)*(p[i+1].deformation-p[i].deformation);en+=.5*(n[i].force+n[i+1].force)*(n[i+1].deformation-n[i].deformation);}return p_.gamma_e*std::max(ep,en);}
+    double energy_capacity()const{const auto p=positive_points();const auto n=negative_points();double ep=.5*p[0].deformation*p[0].force;double en=.5*n[0].deformation*n[0].force;for(std::size_t i=0;i<4;++i){ep+=.5*(p[i].force+p[i+1].force)*(p[i+1].deformation-p[i].deformation);en+=.5*(n[i].force+n[i+1].force)*(n[i+1].deformation-n[i].deformation);}return p_.gamma_e*std::max(ep,en);}
     static double slope(const Pinching4Point&a,const Pinching4Point&b){return(b.force-a.force)/(b.deformation-a.deformation);}static Pinching4Response interp(double u,const Pinching4Point&a,const Pinching4Point&b){double k=slope(a,b);return{a.force+(u-a.deformation)*k,k};}
     static void linear(std::array<Pinching4Point,4>&q){double du=q[3].deformation-q[0].deformation,df=q[3].force-q[0].force;q[1]={q[0].deformation+.33*du,q[0].force+.33*df};q[2]={q[0].deformation+.67*du,q[0].force+.67*df};}
     static void midpoint(std::array<Pinching4Point,4>&q){double du=q[3].deformation-q[1].deformation,df=q[3].force-q[1].force;q[2]={q[1].deformation+.5*du,q[1].force+.5*df};}
