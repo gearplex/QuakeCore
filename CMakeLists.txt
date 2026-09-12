@@ -40,6 +40,7 @@ add_library(quake_core
     src/shear_building.cpp
     src/frame2d.cpp
     src/wall_material.cpp
+    src/concrete_cm.cpp
     src/wall2d.cpp
     src/steel2d.cpp
     src/soil2d.cpp
@@ -186,6 +187,10 @@ add_executable(quake_wall_wrapper_lifecycle_tests tests/test_wall_wrapper_lifecy
 target_link_libraries(quake_wall_wrapper_lifecycle_tests PRIVATE quake_core)
 add_test(NAME quake_wall_wrapper_lifecycle_tests COMMAND quake_wall_wrapper_lifecycle_tests)
 set_tests_properties(quake_wall_wrapper_lifecycle_tests PROPERTIES LABELS "wall;material;gate4;lifecycle")
+add_executable(quake_concrete_cm_envelope_tests tests/test_concrete_cm_envelope.cpp)
+target_link_libraries(quake_concrete_cm_envelope_tests PRIVATE quake_core)
+add_test(NAME quake_concrete_cm_envelope_tests COMMAND quake_concrete_cm_envelope_tests)
+set_tests_properties(quake_concrete_cm_envelope_tests PROPERTIES LABELS "wall;material;gate4;concretecm;oracle")
 add_executable(quake_wall2d_wrapper_tests tests/test_wall2d_wrappers.cpp)
 target_link_libraries(quake_wall2d_wrapper_tests PRIVATE quake_core)
 add_test(NAME quake_wall2d_wrapper_tests COMMAND quake_wall2d_wrapper_tests)
