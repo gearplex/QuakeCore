@@ -34,6 +34,7 @@ struct ElasticFrame2D {
     // used for P-Delta-capable Phase 1 benchmarking; dynamic axial-force updates
     // are intentionally deferred to a later milestone.
     double axial_compression{};
+    bool pdelta_transformation{}; // OpenSees-style sway P/L contribution
 };
 
 enum class NonlinearComponent2DKind { RotationalHinge, PanelZone, BRB, SoilSpring };
@@ -207,7 +208,8 @@ public:
                   double mass_x = 0.0, double mass_y = 0.0, double mass_r = 0.0);
     void add_elastic_frame(int id, int node_i, int node_j,
                            double E, double A, double I,
-                           double axial_compression = 0.0);
+                           double axial_compression = 0.0,
+                           bool pdelta_transformation = false);
     void add_rotational_spring(int id, int node_i, int node_j,
                                double k0, double yield_moment,
                                double post_yield_ratio);
@@ -264,6 +266,7 @@ private:
 std::array<double,36> frame2d_global_stiffness(double xi, double yi,
                                                double xj, double yj,
                                                double E, double A, double I,
-                                               double axial_compression = 0.0);
+                                               double axial_compression = 0.0,
+                                               bool pdelta_transformation = false);
 
 } // namespace quake

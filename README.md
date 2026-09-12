@@ -4,6 +4,12 @@
 
 Research prototype for a high-throughput nonlinear response-history analysis engine for buildings.
 
+## Phase 9M candidate: YORi wall archetype 10001
+
+The current development branch adds nonlinear static gravity equilibration and state transfer, persistent gravity loading during NRHA, gravity-state modal analysis, and an OpenSees-compatible plane-frame `PDelta` sway transformation. For the three-story YORi special nonbearing RC wall archetype 10001, a matched Concrete01/Steel01/bilinear-shear model reproduced OpenSees periods, gravity displacements, peak drifts, and full response histories to near machine precision. Seven integration-only repetitions gave median times of 0.1897 s for QuakeCore and 0.1823 s for OpenSees on the small dense-verification fixture.
+
+This is software verification and independent numerical comparison, not FEMA P-695 acceptance. The exact YORi ConcreteCM + Pinching4 + MinMax + Parallel constitutive stack remains the Phase 9M validation gate. See `docs/PHASE9M_YORI_10001_VALIDATION.md` and `validation/yori_wall_10001/README.md`.
+
 ## Current objective
 
 Test the central solver and compiler hypotheses before writing GPU code:

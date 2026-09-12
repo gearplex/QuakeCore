@@ -7,10 +7,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(QUAKE_ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
 
-find_path(SUPERLU_INCLUDE_DIR slu_ddefs.h PATH_SUFFIXES superlu REQUIRED)
-find_library(SUPERLU_LIBRARY NAMES superlu REQUIRED)
+find_path(SUPERLU_INCLUDE_DIR slu_ddefs.h PATH_SUFFIXES superlu)
+find_library(SUPERLU_LIBRARY NAMES superlu)
 find_package(LAPACK REQUIRED)
 find_package(Threads REQUIRED)
+
+if(SUPERLU_INCLUDE_DIR AND SUPERLU_LIBRARY)
+  set(QUAKE_DIRECT_SOLVER_SOURCE src/superlu_solver.cpp)
+  set(QUAKE_DIRECT_SOLVER_LIB ${SUPERLU_LIBRARY})
+  message(STATUS "QuakeCore direct solver: SuperLU")
+else()
+  set(QUAKE_DIRECT_SOLVER_SOURCE src/dense_lapack_solver.cpp)
+  set(QUAKE_DIRECT_SOLVER_LIB "")
+  message(WARNING "SuperLU not found: using LAPACK dense fallback (verification only)")
+endif()
 
 add_library(quake_core
     src/bilinear.cpp
@@ -24,12 +34,13 @@ add_library(quake_core
     src/nonlinear_material.cpp
     src/sparse.cpp
     src/update_basis.cpp
-    src/superlu_solver.cpp
+    ${QUAKE_DIRECT_SOLVER_SOURCE}
     src/low_rank_solver.cpp
   src/generalized_woodbury.cpp
     src/shear_building.cpp
     src/frame2d.cpp
     src/wall_material.cpp
+    src/concrete_cm.cpp
     src/wall2d.cpp
     src/steel2d.cpp
     src/soil2d.cpp
@@ -45,9 +56,13 @@ add_library(quake_core
     src/calibration.cpp
     src/substructure.cpp
     src/stability.cpp
+    src/static_analysis.cpp
 )
-target_include_directories(quake_core PUBLIC include PRIVATE ${SUPERLU_INCLUDE_DIR})
-target_link_libraries(quake_core PUBLIC ${SUPERLU_LIBRARY} ${LAPACK_LIBRARIES} Threads::Threads)
+target_include_directories(quake_core PUBLIC include)
+if(SUPERLU_INCLUDE_DIR)
+  target_include_directories(quake_core PRIVATE ${SUPERLU_INCLUDE_DIR})
+endif()
+target_link_libraries(quake_core PUBLIC ${QUAKE_DIRECT_SOLVER_LIB} ${LAPACK_LIBRARIES} Threads::Threads)
 target_compile_options(quake_core PRIVATE -Wall -Wextra -Wpedantic)
 
 if(QUAKE_ENABLE_SANITIZERS)
@@ -165,6 +180,20 @@ endif()
 add_executable(quake_wall_tests tests/test_walls.cpp)
 target_link_libraries(quake_wall_tests PRIVATE quake_core)
 add_test(NAME quake_wall_tests COMMAND quake_wall_tests)
+add_executable(quake_wall_material_wrapper_tests tests/test_wall_material_wrappers.cpp)
+target_link_libraries(quake_wall_material_wrapper_tests PRIVATE quake_core)
+add_test(NAME quake_wall_material_wrapper_tests COMMAND quake_wall_material_wrapper_tests)
+add_executable(quake_wall_wrapper_lifecycle_tests tests/test_wall_wrapper_lifecycle.cpp)
+target_link_libraries(quake_wall_wrapper_lifecycle_tests PRIVATE quake_core)
+add_test(NAME quake_wall_wrapper_lifecycle_tests COMMAND quake_wall_wrapper_lifecycle_tests)
+set_tests_properties(quake_wall_wrapper_lifecycle_tests PROPERTIES LABELS "wall;material;gate4;lifecycle")
+add_executable(quake_concrete_cm_envelope_tests tests/test_concrete_cm_envelope.cpp)
+target_link_libraries(quake_concrete_cm_envelope_tests PRIVATE quake_core)
+add_test(NAME quake_concrete_cm_envelope_tests COMMAND quake_concrete_cm_envelope_tests)
+set_tests_properties(quake_concrete_cm_envelope_tests PROPERTIES LABELS "wall;material;gate4;concretecm;oracle")
+add_executable(quake_wall2d_wrapper_tests tests/test_wall2d_wrappers.cpp)
+target_link_libraries(quake_wall2d_wrapper_tests PRIVATE quake_core)
+add_test(NAME quake_wall2d_wrapper_tests COMMAND quake_wall2d_wrapper_tests)
 add_executable(quake_steel_component_tests tests/test_steel_components.cpp)
 target_link_libraries(quake_steel_component_tests PRIVATE quake_core)
 add_test(NAME quake_steel_component_tests COMMAND quake_steel_component_tests)
@@ -184,4 +213,7 @@ if(Python3_Interpreter_FOUND)
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_steel_jobs.py $<TARGET_FILE:quake_run> ${CMAKE_CURRENT_SOURCE_DIR})
   add_test(NAME quake_soil_job_contracts COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_soil_jobs.py $<TARGET_FILE:quake_run> ${CMAKE_CURRENT_SOURCE_DIR})
+  add_test(NAME quake_yori_material_oracle_integrity COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/validation/yori_wall_10001/verify_material_oracle.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/validation/yori_wall_10001/material_oracle_story1.json)
 endif()
