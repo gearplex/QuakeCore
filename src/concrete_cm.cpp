@@ -188,6 +188,34 @@ ConcreteCMResponse rule7(const ConcreteCMState& state, double strain) {
         state.compression_rejoin_tangent);
 }
 
+void populate_positive_rejoin_landmarks(const ConcreteCMEnvelope& envelope_kernel,
+                                        ConcreteCMState& reversal) {
+    const auto& p = envelope_kernel.parameters();
+    const double Esecp = tension_secant(
+        p, reversal.tension_zero_strain, reversal.tension_peak_strain,
+        reversal.tension_peak_stress, reversal.zero_stress_strain);
+    const double esplp = reversal.tension_peak_strain -
+                         reversal.tension_peak_stress / Esecp;
+    const double delfp =
+        reversal.tension_peak_strain >= reversal.tension_zero_strain + p.et / 2.0
+            ? 0.15 * reversal.tension_peak_stress
+            : 0.0;
+    reversal.tension_new_stress = reversal.tension_peak_stress - delfp;
+    reversal.tension_new_tangent =
+        reversal.tension_peak_strain == esplp
+            ? p.Ec
+            : std::min(p.Ec, reversal.tension_new_stress /
+                                 (reversal.tension_peak_strain - esplp));
+
+    reversal.tension_rejoin_strain =
+        reversal.tension_peak_strain +
+        0.22 * std::abs(reversal.tension_peak_strain - reversal.tension_zero_strain);
+    const auto rejoin = envelope_kernel.tension(
+        reversal.tension_rejoin_strain, reversal.tension_zero_strain);
+    reversal.tension_rejoin_stress = rejoin.stress;
+    reversal.tension_rejoin_tangent = rejoin.tangent;
+}
+
 ConcreteCMState first_reversal_state(const ConcreteCMEnvelope& envelope_kernel,
                                      const ConcreteCMState& committed) {
     const auto& p = envelope_kernel.parameters();
@@ -216,30 +244,7 @@ ConcreteCMState first_reversal_state(const ConcreteCMEnvelope& envelope_kernel,
         xup * p.et + reversal.tension_zero_strain;
     reversal.tension_peak_stress = envelope_kernel.tension(
         reversal.tension_peak_strain, reversal.tension_zero_strain).stress;
-
-    const double Esecp = tension_secant(
-        p, reversal.tension_zero_strain, reversal.tension_peak_strain,
-        reversal.tension_peak_stress, reversal.zero_stress_strain);
-    const double esplp = reversal.tension_peak_strain -
-                         reversal.tension_peak_stress / Esecp;
-    const double delfp =
-        reversal.tension_peak_strain >= reversal.tension_zero_strain + p.et / 2.0
-            ? 0.15 * reversal.tension_peak_stress
-            : 0.0;
-    reversal.tension_new_stress = reversal.tension_peak_stress - delfp;
-    reversal.tension_new_tangent =
-        reversal.tension_peak_strain == esplp
-            ? p.Ec
-            : std::min(p.Ec, reversal.tension_new_stress /
-                                 (reversal.tension_peak_strain - esplp));
-
-    reversal.tension_rejoin_strain =
-        reversal.tension_peak_strain +
-        0.22 * std::abs(reversal.tension_peak_strain - reversal.tension_zero_strain);
-    const auto rejoin = envelope_kernel.tension(
-        reversal.tension_rejoin_strain, reversal.tension_zero_strain);
-    reversal.tension_rejoin_stress = rejoin.stress;
-    reversal.tension_rejoin_tangent = rejoin.tangent;
+    populate_positive_rejoin_landmarks(envelope_kernel, reversal);
     return reversal;
 }
 
@@ -286,6 +291,48 @@ ConcreteCMState second_reversal_state(const ConcreteCMEnvelope& envelope_kernel,
     return reversal;
 }
 
+ConcreteCMState second_negative_to_positive_reversal_state(
+    const ConcreteCMEnvelope& envelope_kernel,
+    const ConcreteCMState& committed) {
+    const auto& p = envelope_kernel.parameters();
+    ConcreteCMState reversal = committed;
+    reversal.has_second_negative_to_positive_reversal = true;
+    reversal.unloading_strain = committed.strain;
+    reversal.unloading_stress = committed.stress;
+
+    const auto compression = compression_unloading_landmarks(
+        p, reversal.unloading_strain, reversal.unloading_stress);
+    reversal.zero_stress_strain = compression.zero_stress_strain;
+    reversal.zero_stress_tangent = compression.zero_stress_tangent;
+
+    // OpenSees e0eunpfunpf: the frozen YORi protocol reaches a much larger
+    // prior positive excursion than the normalized second compression
+    // extreme, so xup >= xun and the prior tension history is retained.
+    const double xun = std::abs(reversal.unloading_strain / p.epsc);
+    const double xup = std::abs(
+        (committed.positive_reversal_strain - committed.tension_zero_strain) / p.et);
+    if (xup < xun) {
+        throw std::logic_error(
+            "ConcreteCM second rebound compression-dominant branch is not yet admitted in Gate 4");
+    }
+
+    const double reference_peak_strain = committed.positive_reversal_strain;
+    const double reference_peak_stress = committed.positive_reversal_stress;
+    const double reference_secant = tension_secant(
+        p, committed.tension_zero_strain, reference_peak_strain,
+        reference_peak_stress, reversal.zero_stress_strain);
+    const double dele0 = 2.0 * reference_peak_stress /
+                         (reference_secant + reversal.zero_stress_tangent);
+
+    reversal.tension_zero_strain =
+        reversal.zero_stress_strain + dele0 - xup * p.et;
+    reversal.tension_peak_strain = xup * p.et + reversal.tension_zero_strain;
+    reversal.tension_peak_stress = envelope_kernel.tension(
+        reversal.tension_peak_strain, reversal.tension_zero_strain).stress;
+    populate_positive_rejoin_landmarks(envelope_kernel, reversal);
+    return reversal;
+}
+
 ConcreteCMTrial make_trial(const ConcreteCMState& base,
                            double strain,
                            ConcreteCMResponse response,
@@ -300,9 +347,9 @@ ConcreteCMTrial make_trial(const ConcreteCMState& base,
     return {response, next};
 }
 
-ConcreteCMTrial first_positive_path_trial(const ConcreteCMEnvelope& envelope_kernel,
-                                          const ConcreteCMState& base,
-                                          double strain) {
+ConcreteCMTrial positive_path_trial(const ConcreteCMEnvelope& envelope_kernel,
+                                    const ConcreteCMState& base,
+                                    double strain) {
     const auto& p = envelope_kernel.parameters();
     if (strain <= base.zero_stress_strain) {
         return make_trial(base, strain, compression_rule3(p, base, strain), 1.0,
@@ -406,20 +453,26 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
             return make_trial(committed, strain, envelope_.compression(strain), -1.0,
                               ConcreteCMRule::CompressionEnvelope);
         }
-        if (committed.has_positive_to_negative_reversal) {
-            throw std::logic_error(
-                "ConcreteCM second negative-to-positive reversal is not yet admitted in Gate 4");
-        }
         if (!(committed.strain < 0.0) || !(committed.stress < 0.0)) {
             throw std::logic_error(
-                "ConcreteCM first reversal requires a committed compression point");
+                "ConcreteCM negative-to-positive reversal requires a committed compression point");
+        }
+        if (committed.has_second_negative_to_positive_reversal) {
+            throw std::logic_error(
+                "ConcreteCM deeper nested reversal is not yet admitted in Gate 4");
+        }
+        if (committed.has_positive_to_negative_reversal) {
+            const auto reversal = second_negative_to_positive_reversal_state(
+                envelope_, committed);
+            return positive_path_trial(envelope_, reversal, strain);
         }
         const auto reversal = first_reversal_state(envelope_, committed);
-        return first_positive_path_trial(envelope_, reversal, strain);
+        return positive_path_trial(envelope_, reversal, strain);
     }
 
     const bool first_rebound = committed.unloading_strain < 0.0;
     if (first_rebound && !committed.has_positive_to_negative_reversal &&
+        !committed.has_second_negative_to_positive_reversal &&
         (committed.rule == ConcreteCMRule::CompressionUnloading ||
          committed.rule == ConcreteCMRule::CompressionToTension ||
          committed.rule == ConcreteCMRule::TensionRejoining ||
@@ -434,10 +487,11 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
             const auto reversal = second_reversal_state(envelope_, committed);
             return first_negative_return_trial(envelope_, reversal, strain);
         }
-        return first_positive_path_trial(envelope_, committed, strain);
+        return positive_path_trial(envelope_, committed, strain);
     }
 
     if (committed.has_positive_to_negative_reversal &&
+        !committed.has_second_negative_to_positive_reversal &&
         (committed.rule == ConcreteCMRule::TensionUnloading ||
          committed.rule == ConcreteCMRule::TensionToCompression ||
          committed.rule == ConcreteCMRule::CompressionRejoining)) {
@@ -446,6 +500,19 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
                 "ConcreteCM reversal from the first negative return is not yet admitted in Gate 4");
         }
         return first_negative_return_trial(envelope_, committed, strain);
+    }
+
+    if (committed.has_second_negative_to_positive_reversal &&
+        (committed.rule == ConcreteCMRule::CompressionUnloading ||
+         committed.rule == ConcreteCMRule::CompressionToTension ||
+         committed.rule == ConcreteCMRule::TensionRejoining ||
+         committed.rule == ConcreteCMRule::TensionEnvelope ||
+         committed.rule == ConcreteCMRule::TensionCutoff)) {
+        if (strain < committed.strain) {
+            throw std::logic_error(
+                "ConcreteCM reversal from the second rebound is not yet admitted in Gate 4");
+        }
+        return positive_path_trial(envelope_, committed, strain);
     }
 
     if (committed.rule == ConcreteCMRule::TensionEnvelope ||

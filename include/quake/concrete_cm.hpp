@@ -40,8 +40,9 @@ struct ConcreteCMState {
     double increment{};
     ConcreteCMRule rule{ConcreteCMRule::Initial};
 
-    // First negative-to-positive reversal history. These landmarks are frozen
-    // at the reversal and carried through the first positive excursion.
+    // Negative-to-positive reversal landmarks. These are refreshed when a
+    // new compression-envelope extreme is admitted and then drive rules
+    // 3, 9, 8, and the shifted positive envelope.
     double unloading_strain{};
     double unloading_stress{};
     double zero_stress_strain{};
@@ -67,6 +68,12 @@ struct ConcreteCMState {
     double compression_rejoin_strain{};
     double compression_rejoin_stress{};
     double compression_rejoin_tangent{};
+
+    // Second negative-to-positive reversal. Gate 4 currently admits only
+    // the retained-prior-tension-history branch exercised by the frozen
+    // YORi story-1 ConcreteCM protocol. Deeper nested reversals remain out
+    // of scope and are rejected.
+    bool has_second_negative_to_positive_reversal{false};
 };
 
 struct ConcreteCMTrial {
@@ -86,10 +93,11 @@ private:
     ConcreteCMParameters parameters_;
 };
 
-// Incremental Gate 4 ConcreteCM state machine. The admitted cyclic scope now
-// covers the first complete compression -> tension -> compression excursion:
-// rules 3/9/8/2 followed by 4/10/7/1. A subsequent reversal from the second
-// compression extreme is rejected until nested-cycle rules are admitted.
+// Incremental Gate 4 ConcreteCM state machine. The admitted cyclic scope
+// covers the complete frozen YORi story-1 protocol: compression -> tension ->
+// compression followed by the second rebound through rules 3/9/8/2. Deeper
+// nested reversals remain rejected until independently admitted against an
+// OpenSees 3.8.0 oracle.
 class ConcreteCM {
 public:
     explicit ConcreteCM(ConcreteCMParameters parameters);

@@ -22,11 +22,11 @@ void check(bool ok, const char* message) {
     if (!ok) throw std::runtime_error(message);
 }
 
-std::vector<double> protocol_through_second_compression_peak() {
+std::vector<double> full_protocol() {
     std::vector<double> strains{0.0};
     const double targets[] = {
         -0.0005, -0.0020, -0.0040, -0.0010, 0.0002, 0.0010, 0.0025,
-        0.0, -0.0060, -0.0120,
+        0.0, -0.0060, -0.0120, -0.0020, 0.0,
     };
     for (double target : targets) {
         const double start = strains.back();
@@ -38,7 +38,7 @@ std::vector<double> protocol_through_second_compression_peak() {
 }
 
 std::vector<double> compression_protocol_prefix() {
-    auto all = protocol_through_second_compression_peak();
+    auto all = full_protocol();
     all.resize(61);
     return all;
 }
@@ -77,7 +77,7 @@ ConcreteCMParameters yori_parameters(double fc,
 }
 
 ConcreteCMState commit_through_step(const ConcreteCM& material, int final_step) {
-    const auto strains = protocol_through_second_compression_peak();
+    const auto strains = full_protocol();
     auto committed = material.initial_state();
     for (int step = 0; step <= final_step; ++step) {
         committed = material.trial(strains[static_cast<std::size_t>(step)], committed).state;
@@ -92,29 +92,31 @@ struct Checkpoint {
     ConcreteCMRule rule{};
 };
 
-void verify_first_full_excursion(const ConcreteCM& material,
-                                 const std::vector<Checkpoint>& checkpoints,
-                                 double expected_work_step200,
-                                 double rule9_strain,
-                                 double rule9_stress,
-                                 double rule9_tangent) {
-    const auto strains = protocol_through_second_compression_peak();
+void verify_full_protocol(const ConcreteCM& material,
+                          const std::vector<Checkpoint>& checkpoints,
+                          double expected_work_step240,
+                          double rule9_strain,
+                          double rule9_stress,
+                          double rule9_tangent) {
+    const auto strains = full_protocol();
+    check(strains.size() == 241, "ConcreteCM frozen protocol should contain 241 points");
+
     auto committed = material.initial_state();
     double work = 0.0;
     double previous_strain = 0.0;
     double previous_stress = 0.0;
 
-    for (int step = 0; step <= 200; ++step) {
+    for (int step = 0; step <= 240; ++step) {
         const double strain = strains[static_cast<std::size_t>(step)];
         const auto trial = material.trial(strain, committed);
         for (const auto& point : checkpoints) {
             if (point.step != step) continue;
             check(near(trial.response.stress, point.stress),
-                  "ConcreteCM full excursion stress disagrees with frozen OpenSees oracle");
+                  "ConcreteCM full protocol stress disagrees with frozen OpenSees oracle");
             check(near(trial.response.tangent, point.tangent),
-                  "ConcreteCM full excursion tangent disagrees with frozen OpenSees oracle");
+                  "ConcreteCM full protocol tangent disagrees with frozen OpenSees oracle");
             check(trial.state.rule == point.rule,
-                  "ConcreteCM full excursion rule classification disagrees with OpenSees path");
+                  "ConcreteCM full protocol rule classification disagrees with OpenSees path");
         }
         if (step > 0) {
             work += 0.5 * (previous_stress + trial.response.stress) *
@@ -124,8 +126,8 @@ void verify_first_full_excursion(const ConcreteCM& material,
         previous_stress = trial.response.stress;
         committed = trial.state;
     }
-    check(near(work, expected_work_step200, 1.0e-10, 1.0e-13),
-          "ConcreteCM full excursion work disagrees with frozen OpenSees oracle");
+    check(near(work, expected_work_step240, 1.0e-10, 1.0e-13),
+          "ConcreteCM full protocol work disagrees with frozen OpenSees oracle");
 
     const auto step60 = commit_through_step(material, 60);
     const auto probe_a = material.trial(rule9_strain, step60);
@@ -139,14 +141,26 @@ void verify_first_full_excursion(const ConcreteCM& material,
           near(probe_a.response.tangent, probe_b.response.tangent),
           "ConcreteCM targeted rule-9 trial mutated committed state");
 
+    const auto step200 = commit_through_step(material, 200);
+    const auto rebound_a = material.trial(strains[201], step200);
+    const auto rebound_b = material.trial(strains[201], step200);
+    check(rebound_a.state.has_second_negative_to_positive_reversal,
+          "ConcreteCM step-201 trial did not mark the admitted second rebound");
+    check(near(rebound_a.response.stress, rebound_b.response.stress) &&
+          near(rebound_a.response.tangent, rebound_b.response.tangent),
+          "ConcreteCM step-201 pure trial mutated committed state");
+    check(step200.rule == ConcreteCMRule::CompressionEnvelope &&
+          !step200.has_second_negative_to_positive_reversal,
+          "ConcreteCM step-201 pure trial mutated the supplied committed state");
+
     bool rejected_reversal = false;
     try {
-        (void)material.trial(-0.0115, committed); // protocol step 201
+        (void)material.trial(-0.0001, committed);
     } catch (const std::logic_error&) {
         rejected_reversal = true;
     }
     check(rejected_reversal,
-          "ConcreteCM admitted unvalidated second negative-to-positive reversal behavior");
+          "ConcreteCM admitted an unvalidated reversal after the frozen protocol");
 }
 
 } // namespace
@@ -164,7 +178,7 @@ int main() try {
         0.019733877567269662);
 
     const ConcreteCM unconfined(unconfined_parameters);
-    verify_first_full_excursion(
+    verify_full_protocol(
         unconfined,
         {
             {77, -0.00635885151364235, 136.28274884804978,
@@ -175,24 +189,32 @@ int main() try {
              ConcreteCMRule::TensionEnvelope},
             {141, 0.008690544844429719, 26.415420513127174,
              ConcreteCMRule::TensionUnloading},
-            {144, 0.000442655318296601, 19.189810520831088,
-             ConcreteCMRule::TensionUnloading},
             {145, -0.0023379185693622605, 28.172758549492265,
              ConcreteCMRule::TensionToCompression},
-            {160, -0.4085274336946412, 449.9597538601236,
-             ConcreteCMRule::TensionToCompression},
-            {173, -4.639665697801751, 1788.214999460805,
-             ConcreteCMRule::TensionToCompression},
             {174, -5.110196383181005, 1065.475810265215,
-             ConcreteCMRule::CompressionRejoining},
-            {175, -5.255450336808381, -99.28121074510159,
              ConcreteCMRule::CompressionRejoining},
             {176, -5.126850515281235, -495.76647770689294,
              ConcreteCMRule::CompressionEnvelope},
             {200, -1.5573318757916055, -495.76647770689294,
              ConcreteCMRule::CompressionEnvelope},
+            {201, -0.8834864310566235, 935.8020713450278,
+             ConcreteCMRule::CompressionUnloading},
+            {206, -1.1760681025485553e-05, 2.135992113229804,
+             ConcreteCMRule::CompressionUnloading},
+            {207, 0.0023479104685855184, 9.60034348183496,
+             ConcreteCMRule::CompressionToTension},
+            {208, 0.009601581445333164, 19.414387173501645,
+             ConcreteCMRule::CompressionToTension},
+            {209, 0.011970462484724314, 0.7817652245539541,
+             ConcreteCMRule::TensionRejoining},
+            {210, 0.011891238122979231, -0.6885299881381444,
+             ConcreteCMRule::TensionEnvelope},
+            {220, 0.009800016755910655, -0.2645286736917171,
+             ConcreteCMRule::TensionEnvelope},
+            {240, 0.009332851314804602, -0.2068250932057661,
+             ConcreteCMRule::TensionEnvelope},
         },
-        0.05211791880439542,
+        0.050919645670333524,
         -0.0013340890634169552,
         0.011560052531841973,
         819.4827307488272);
@@ -209,7 +231,7 @@ int main() try {
         0.021221688703467297);
 
     const ConcreteCM confined(confined_parameters);
-    verify_first_full_excursion(
+    verify_full_protocol(
         confined,
         {
             {76, -0.025911682694002458, 413.5412413501326,
@@ -220,29 +242,39 @@ int main() try {
              ConcreteCMRule::TensionEnvelope},
             {141, 0.009642230354284938, 28.527765281919528,
              ConcreteCMRule::TensionUnloading},
-            {144, 0.0007380029132003692, 20.710376657319102,
-             ConcreteCMRule::TensionUnloading},
             {145, -0.0020993237393562374, 28.167253842147105,
              ConcreteCMRule::TensionToCompression},
-            {160, -0.5345040951139467, 625.8758431284255,
-             ConcreteCMRule::TensionToCompression},
-            {173, -6.983062707613081, 2834.9727606129,
-             ConcreteCMRule::TensionToCompression},
             {174, -7.584188657570592, 1153.1804831201682,
-             ConcreteCMRule::CompressionRejoining},
-            {176, -7.945980732674475, 198.9481591447111,
              ConcreteCMRule::CompressionRejoining},
             {177, -7.961575585545971, -71.5479505326459,
              ConcreteCMRule::CompressionEnvelope},
             {200, -7.467894726870714, -71.5479505326459,
              ConcreteCMRule::CompressionEnvelope},
+            {201, -5.682890704010626, 2998.9047347411415,
+             ConcreteCMRule::CompressionUnloading},
+            {210, -0.027426053914848758, 141.29222857050627,
+             ConcreteCMRule::CompressionUnloading},
+            {211, 0.00034971837576002927, 4.154970951684991,
+             ConcreteCMRule::CompressionToTension},
+            {212, 0.004919158972324763, 14.200654886952332,
+             ConcreteCMRule::CompressionToTension},
+            {213, 0.012490426557548964, 3.773005534097152,
+             ConcreteCMRule::TensionRejoining},
+            {214, 0.013247029450263513, 0.11029334064593144,
+             ConcreteCMRule::TensionRejoining},
+            {215, 0.012982384714799415, -0.7039778689077104,
+             ConcreteCMRule::TensionEnvelope},
+            {220, 0.011644515255360165, -0.41197942990929065,
+             ConcreteCMRule::TensionEnvelope},
+            {240, 0.010940821678976793, -0.30179975078300614,
+             ConcreteCMRule::TensionEnvelope},
         },
-        0.08868877526304741,
+        0.07702171917559245,
         -0.0014778637051757941,
         0.01487206449348923,
         1622.5199509108309);
 
-    std::cout << "ConcreteCM first complete cyclic excursion matches admitted OpenSees 3.8.0 references.\n";
+    std::cout << "ConcreteCM full frozen cyclic protocol matches admitted OpenSees 3.8.0 references.\n";
     return 0;
 } catch (const std::exception& e) {
     std::cerr << e.what() << '\n';
