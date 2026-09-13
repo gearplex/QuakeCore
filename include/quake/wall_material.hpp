@@ -1,5 +1,6 @@
 #pragma once
 #include "quake/bilinear.hpp"
+#include "quake/concrete_cm.hpp"
 #include "quake/pinching4_cycle.hpp"
 #include <array>
 #include <memory>
@@ -10,10 +11,11 @@ namespace quake {
 // All histories are explicit values: trial evaluation never mutates the material.
 class WallUniaxial {
 public:
-    enum class Kind { Elastic, SteelBilinear, Concrete01, Pinching4, MinMax, Parallel };
+    enum class Kind { Elastic, SteelBilinear, Concrete01, ConcreteCM, Pinching4, MinMax, Parallel };
     static WallUniaxial elastic(double E);
     static WallUniaxial steel(double E, double fy, double b);
     static WallUniaxial concrete01(double fc, double epsc, double fcu, double epsu);
+    static WallUniaxial concrete_cm(ConcreteCMParameters parameters);
     static WallUniaxial pinching4(Pinching4CyclicParameters parameters);
     static WallUniaxial minmax(WallUniaxial material, double min_strain, double max_strain);
     static WallUniaxial parallel(std::vector<WallUniaxial> materials);
@@ -27,6 +29,7 @@ private:
     Kind kind_{Kind::Elastic};
     double E_{1}, fy_{1}, b_{0}, fc_{-1}, ec_{-.002}, fu_{0}, eu_{-.006};
     double min_strain_{}, max_strain_{};
+    std::shared_ptr<const ConcreteCMParameters> concrete_cm_parameters_;
     std::shared_ptr<const Pinching4CyclicParameters> pinching4_parameters_;
     std::shared_ptr<const std::vector<WallUniaxial>> children_;
 };
