@@ -8,7 +8,28 @@
 namespace quake {
 namespace {
 void positive(double x) { if(!std::isfinite(x)||x<=0)throw std::invalid_argument("wall material modulus/strength must be finite and positive"); }
+constexpr int concrete_cm_state_size=28;
 constexpr int pinching4_state_size=17;
+void encode_concrete_cm_state(const ConcreteCMState& s,double* v){
+    v[0]=static_cast<int>(s.rule);v[1]=s.strain;v[2]=s.stress;v[3]=s.tangent;v[4]=s.increment;
+    v[5]=s.unloading_strain;v[6]=s.unloading_stress;v[7]=s.zero_stress_strain;v[8]=s.zero_stress_tangent;
+    v[9]=s.tension_zero_strain;v[10]=s.tension_peak_strain;v[11]=s.tension_peak_stress;v[12]=s.tension_new_stress;v[13]=s.tension_new_tangent;
+    v[14]=s.tension_rejoin_strain;v[15]=s.tension_rejoin_stress;v[16]=s.tension_rejoin_tangent;
+    v[17]=s.has_positive_to_negative_reversal?1.0:0.0;v[18]=s.positive_reversal_strain;v[19]=s.positive_reversal_stress;
+    v[20]=s.positive_zero_stress_strain;v[21]=s.positive_zero_stress_tangent;v[22]=s.compression_new_stress;v[23]=s.compression_new_tangent;
+    v[24]=s.compression_rejoin_strain;v[25]=s.compression_rejoin_stress;v[26]=s.compression_rejoin_tangent;
+    v[27]=s.has_second_negative_to_positive_reversal?1.0:0.0;
+}
+ConcreteCMState decode_concrete_cm_state(const double* v){
+    ConcreteCMState s;s.rule=static_cast<ConcreteCMRule>(static_cast<int>(v[0]));s.strain=v[1];s.stress=v[2];s.tangent=v[3];s.increment=v[4];
+    s.unloading_strain=v[5];s.unloading_stress=v[6];s.zero_stress_strain=v[7];s.zero_stress_tangent=v[8];
+    s.tension_zero_strain=v[9];s.tension_peak_strain=v[10];s.tension_peak_stress=v[11];s.tension_new_stress=v[12];s.tension_new_tangent=v[13];
+    s.tension_rejoin_strain=v[14];s.tension_rejoin_stress=v[15];s.tension_rejoin_tangent=v[16];
+    s.has_positive_to_negative_reversal=v[17]!=0.0;s.positive_reversal_strain=v[18];s.positive_reversal_stress=v[19];
+    s.positive_zero_stress_strain=v[20];s.positive_zero_stress_tangent=v[21];s.compression_new_stress=v[22];s.compression_new_tangent=v[23];
+    s.compression_rejoin_strain=v[24];s.compression_rejoin_stress=v[25];s.compression_rejoin_tangent=v[26];
+    s.has_second_negative_to_positive_reversal=v[27]!=0.0;return s;
+}
 void encode_pinching4_state(const Pinching4State& s,double* v){
     v[0]=static_cast<int>(s.kind);v[1]=s.deformation;v[2]=s.force;v[3]=s.tangent;v[4]=s.deformation_rate;
     v[5]=s.low_state_deformation;v[6]=s.low_state_force;v[7]=s.high_state_deformation;v[8]=s.high_state_force;
@@ -32,6 +53,11 @@ WallUniaxial WallUniaxial::concrete01(double fc,double ec,double fu,double eu) {
         throw std::invalid_argument("concrete01 requires fc<0, epsc<0, fc<=fcu<=0, epsu<epsc");
     WallUniaxial m;m.kind_=Kind::Concrete01;m.fc_=fc;m.ec_=ec;m.fu_=fu;m.eu_=eu;m.E_=2*fc/ec;positive(m.E_);return m;
 }
+WallUniaxial WallUniaxial::concrete_cm(ConcreteCMParameters parameters) {
+    ConcreteCM material(parameters);
+    WallUniaxial m;m.kind_=Kind::ConcreteCM;m.concrete_cm_parameters_=std::make_shared<const ConcreteCMParameters>(std::move(parameters));
+    m.E_=material.initial_state().tangent;return m;
+}
 WallUniaxial WallUniaxial::pinching4(Pinching4CyclicParameters parameters) {
     Pinching4 material(parameters);
     WallUniaxial m;m.kind_=Kind::Pinching4;m.pinching4_parameters_=std::make_shared<const Pinching4CyclicParameters>(std::move(parameters));
@@ -53,12 +79,14 @@ double WallUniaxial::initial_tangent() const {
     return E_;
 }
 int WallUniaxial::state_size() const {
+    if(kind_==Kind::ConcreteCM)return concrete_cm_state_size;
     if(kind_==Kind::Pinching4)return pinching4_state_size;
     if(kind_==Kind::MinMax){const int n=children_->front().state_size();if(n==std::numeric_limits<int>::max())throw std::overflow_error("wall material state size overflow");return n+1;}
     if(kind_==Kind::Parallel){int n=0;for(const auto& child:*children_){const int c=child.state_size();if(c>std::numeric_limits<int>::max()-n)throw std::overflow_error("wall material state size overflow");n+=c;}return n;}
     return 6;
 }
 void WallUniaxial::initialize(double* s) const {
+    if(kind_==Kind::ConcreteCM){encode_concrete_cm_state(ConcreteCM(*concrete_cm_parameters_).initial_state(),s);return;}
     if(kind_==Kind::Pinching4){encode_pinching4_state(Pinching4(*pinching4_parameters_).initial_state(),s);return;}
     if(kind_==Kind::MinMax){const auto& child=children_->front();child.initialize(s);s[child.state_size()]=0;return;}
     if(kind_==Kind::Parallel){int o=0;for(const auto& child:*children_){child.initialize(s+o);o+=child.state_size();}return;}
@@ -67,6 +95,7 @@ void WallUniaxial::initialize(double* s) const {
 WallUniaxial::Result WallUniaxial::trial(double e,const double* s,double* t) const {
     if(!std::isfinite(e))throw std::invalid_argument("nonfinite wall material strain");
     const int nstate=state_size();for(int i=0;i<nstate;++i)if(!std::isfinite(s[i]))throw std::invalid_argument("nonfinite wall material state");
+    if(kind_==Kind::ConcreteCM){const auto r=ConcreteCM(*concrete_cm_parameters_).trial(e,decode_concrete_cm_state(s));encode_concrete_cm_state(r.state,t);return {r.response.stress,r.response.tangent};}
     if(kind_==Kind::Pinching4){const auto r=Pinching4(*pinching4_parameters_).trial(e,decode_pinching4_state(s));encode_pinching4_state(r.state,t);return {r.response.force,r.response.tangent};}
     if(kind_==Kind::MinMax){
         const auto& child=children_->front();const int n=child.state_size();std::copy(s,s+n+1,t);
