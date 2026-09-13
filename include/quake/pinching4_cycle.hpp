@@ -27,9 +27,9 @@ struct Pinching4State{
 };
 struct Pinching4Trial{Pinching4Response response{};Pinching4State state{};};
 
-// Gate 4 stateful slice: virgin loading, the first positive-to-negative and
-// negative-to-positive transitions, and envelope re-entry through frozen
-// steel_raw step 120. Further reversals are deliberately rejected.
+// Gate 4 stateful slice: virgin loading, the first two positive-to-negative
+// transitions, the first negative-to-positive transition, and envelope re-entry
+// through frozen steel_raw step 140. The next reversal is deliberately rejected.
 class Pinching4{
 public:
     explicit Pinching4(Pinching4CyclicParameters p):p_(p),env_(p.envelope){
@@ -76,14 +76,14 @@ private:
             if(u>t.high_state_deformation){to_positive_envelope(t);}
             else if(u<t.low_state_deformation){to_negative_envelope(t);}return;}
         if(t.kind==Pinching4StateKind::PositiveEnvelope&&du<0.0){
-            if(t.reversal_count>=2)throw std::logic_error("Pinching4 second positive-to-negative reversal is not yet admitted in Gate 4");
+            if(t.reversal_count>=3)throw std::logic_error("Pinching4 additional positive-to-negative reversal is not yet admitted in Gate 4");
             ++t.reversal_count;
             if(c.deformation>t.max_demand)t.max_demand=c.deformation;
             if(t.max_demand<t.damaged_max)t.max_demand=t.damaged_max;
             if(u<t.damaged_min){to_negative_envelope(t);}else{t.kind=Pinching4StateKind::PositiveToNegative;t.low_state_deformation=t.damaged_min;t.low_state_force=env_.negative(t.damaged_min).force;t.high_state_deformation=c.deformation;t.high_state_force=c.force;}return;}
         if(t.kind==Pinching4StateKind::PositiveToNegative){if(u<t.low_state_deformation)to_negative_envelope(t);else if(du>0.0)throw std::logic_error("Pinching4 reversal from state 3 is not yet admitted in Gate 4");return;}
         if(t.kind==Pinching4StateKind::NegativeEnvelope&&du>0.0){
-            if(t.reversal_count>=2)throw std::logic_error("Pinching4 additional negative-to-positive reversal is not yet admitted in Gate 4");
+            if(t.reversal_count>=3)throw std::logic_error("Pinching4 additional negative-to-positive reversal is not yet admitted in Gate 4");
             ++t.reversal_count;
             if(c.deformation<t.min_demand)t.min_demand=c.deformation;
             if(t.min_demand>t.damaged_min)t.min_demand=t.damaged_min;
