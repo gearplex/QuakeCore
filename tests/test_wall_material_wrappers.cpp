@@ -16,11 +16,11 @@ Pinching4CyclicParameters yori_steel(){
     p.gamma_d={0.1,0.0,0.0,0.0};p.gamma_d_limit=2.0;p.gamma_e=10000.0;p.damage_mode=Pinching4DamageMode::Energy;p.admitted_reversal_count=10;
     return p;
 }
-std::vector<double> steel_protocol_to_240(){
+std::vector<double> steel_protocol(){
     std::vector<double> v{0.0};
     auto segment=[&](double a,double b){for(int i=1;i<=20;++i)v.push_back(a+(b-a)*i/20.0);};
     segment(0,.001);segment(.001,.004);segment(.004,0);segment(0,-.004);segment(-.004,0);segment(0,.012);segment(.012,-.012);
-    segment(-.012,.035);segment(.035,-.035);segment(-.035,.060);segment(.060,-.060);segment(-.060,.080);
+    segment(-.012,.035);segment(.035,-.035);segment(-.035,.060);segment(.060,-.060);segment(-.060,.080);segment(.080,-.080);segment(-.080,0.0);
     return v;
 }
 int main(){try{
@@ -37,23 +37,28 @@ int main(){try{
     auto nf=nested.trial(.021,ns.data(),nt.data());near(nf.stress,.378,1e-12,"nested fail stress");near(nf.tangent,18.000001,1e-12,"nested fail tangent");auto ncomm=nt;auto n2=nested.trial(.01,ncomm.data(),nt.data());near(n2.stress,.18,1e-12,"nested permanent branch stress");near(n2.tangent,18.000001,1e-12,"nested permanent branch tangent");
     WallPanel panel(0,.2,{{0,1,nested},{1.5707963267948966,1,WallUniaxial::elastic(5)}});check(panel.state_size()==19,"panel dynamic state size");auto ps=panel.initial_state();auto pv=panel.trial({.01,0,0},ps.data());near(pv.stress[0],1.18,1e-12,"panel wrapper stress");
 
-    // Gate 4 integration seam: Pinching4 is now a wall material and therefore
-    // composes through the already verified MinMax + Parallel lifecycle. The
-    // exact received MinMax limits are not in the checked-in source input; a
-    // protocol-scoped limit inside the oracle's (0.073, 0.080] failure bracket
-    // is sufficient to verify the sampled step-239 -> step-240 transition.
+    // Gate 4 integration seam: Pinching4 composes through MinMax + Parallel.
+    // The exact received MinMax limits are unavailable because the source
+    // model-input file is not checked in. A protocol-scoped +/-0.075 limit
+    // reproduces the frozen sampled failure bracket (0.073,0.080]; this proves
+    // sampled wrapper lifecycle parity, not exact recovery of m[30]/m[31].
     auto raw=WallUniaxial::pinching4(yori_steel());
     check(raw.state_size()==17,"Pinching4 wall state size");near(raw.initial_tangent(),28999.941414259767,1e-10,"Pinching4 wall initial tangent");
     auto wrapped=WallUniaxial::parallel({WallUniaxial::minmax(raw,-.075,.075),WallUniaxial::elastic(.01)});
     std::vector<double> ws(wrapped.state_size()),wt(wrapped.state_size());wrapped.initialize(ws.data());
-    auto protocol=steel_protocol_to_240();
+    auto protocol=steel_protocol();
+    double work=0.0,previous_stress=0.0,previous_strain=0.0;
     for(std::size_t step=0;step<protocol.size();++step){
         auto r=wrapped.trial(protocol[step],ws.data(),wt.data());
-        if(step==238){near(r.stress,33.00066002921643,1e-10,"wrapped oracle step238 stress");near(r.tangent,.01005044272310952,1e-12,"wrapped oracle step238 tangent");}
-        if(step==239){near(r.stress,33.00073038231548,1e-10,"wrapped oracle step239 stress");near(r.tangent,.01005044272310952,1e-12,"wrapped oracle step239 tangent");}
-        if(step==240){near(r.stress,.0008,1e-12,"wrapped oracle step240 stress");near(r.tangent,.010289999414142598,1e-12,"wrapped oracle step240 tangent");}
-        ws=wt;
+        if(step>0)work+=0.5*(previous_stress+r.stress)*(protocol[step]-previous_strain);
+        if(step==238){near(r.stress,33.00066002921643,1e-10,"wrapped oracle step238 stress");near(r.tangent,.01005044272310952,1e-12,"wrapped oracle step238 tangent");near(work,23.305496881451734,1e-10,"wrapped oracle step238 work");}
+        if(step==239){near(r.stress,33.00073038231548,1e-10,"wrapped oracle step239 stress");near(r.tangent,.01005044272310952,1e-12,"wrapped oracle step239 tangent");near(work,23.536501747892096,1e-10,"wrapped oracle step239 work");}
+        if(step==240){near(r.stress,.0008,1e-12,"wrapped oracle step240 stress");near(r.tangent,.010289999414142598,1e-12,"wrapped oracle step240 tangent");near(work,23.6520071042302,1e-10,"wrapped oracle step240 work");}
+        if(step==260){near(r.stress,-.0008,1e-12,"wrapped oracle step260 stress");near(r.tangent,.010289999414142598,1e-12,"wrapped oracle step260 tangent");near(work,23.6520071042302,1e-10,"wrapped oracle step260 work");}
+        if(step==280){near(r.stress,0.0,1e-12,"wrapped oracle step280 stress");near(r.tangent,.010289999414142598,1e-12,"wrapped oracle step280 tangent");near(work,23.6519751042302,1e-10,"wrapped oracle step280 work");}
+        previous_stress=r.stress;previous_strain=protocol[step];ws=wt;
     }
-    auto post=wrapped.trial(.072,ws.data(),wt.data());near(post.stress,.00072,1e-12,"wrapped permanent failure stress");near(post.tangent,.010289999414142598,1e-12,"wrapped permanent failure tangent");
-    std::cout<<"wrapper state, Pinching4 bridge, rollback, and failure checks passed\n";return 0;
+    check(protocol.size()==281,"wrapped full protocol size");
+    auto post=wrapped.trial(.01,ws.data(),wt.data());near(post.stress,.0001,1e-12,"wrapped permanent failure stress");near(post.tangent,.010289999414142598,1e-12,"wrapped permanent failure tangent");
+    std::cout<<"wrapper state, full sampled Pinching4-MinMax-Parallel lifecycle, rollback, and failure checks passed\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
