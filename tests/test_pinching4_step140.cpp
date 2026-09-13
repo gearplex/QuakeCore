@@ -34,7 +34,7 @@ Pinching4 material(){
     p.gamma_d_limit=2.0;
     p.gamma_e=10000.0;
     p.damage_mode=Pinching4DamageMode::Energy;
-    p.admitted_reversal_count=3;
+    p.admitted_reversal_count=4;
     return Pinching4(p);
 }
 }
@@ -50,6 +50,7 @@ int main(){try{
     for(int i=1;i<=20;++i)protocol.push_back(-0.004*(1.0-i/20.0));
     for(int i=1;i<=20;++i)protocol.push_back(0.012*i/20.0);
     for(int i=1;i<=20;++i)protocol.push_back(0.012*(1.0-i/10.0));
+    for(int i=1;i<=20;++i)protocol.push_back(-0.012+(0.035+0.012)*i/20.0);
 
     struct Point{int step;double force;double tangent;double work;Pinching4StateKind kind;};
     const Point points[]={
@@ -61,30 +62,38 @@ int main(){try{
         {133,-62.52449846910956,356.87499126204204,1.6221214231252878,Pinching4StateKind::PositiveToNegative},
         {134,-63.38999922107336,1450.0018973854026,1.6976701217393977,Pinching4StateKind::NegativeEnvelope},
         {136,-66.68955359846188,204.05715985559664,1.8538738552286418,Pinching4StateKind::NegativeEnvelope},
-        {140,-67.66902796576875,204.05715985559664,2.1763344509827953,Pinching4StateKind::NegativeEnvelope}};
+        {140,-67.66902796576875,204.05715985559664,2.1763344509827953,Pinching4StateKind::NegativeEnvelope},
+        {141,0.48083435774169914,28999.941414259767,2.0973883234933637,Pinching4StateKind::NegativeToPositive},
+        {142,33.30219375942493,2229.4719995134415,2.1370833815310344,Pinching4StateKind::NegativeToPositive},
+        {148,64.73774895256446,2229.4719995134415,2.8282649776505595,Pinching4StateKind::NegativeToPositive},
+        {149,67.39296610104573,128.6248040863558,2.9835185678385514,Pinching4StateKind::NegativeToPositive},
+        {150,67.69523439064866,128.6248040863558,3.142247203416292,Pinching4StateKind::NegativeToPositive},
+        {151,68.0465337115016,204.05715985559664,3.301743780936319,Pinching4StateKind::PositiveEnvelope},
+        {160,72.36234264244747,204.05715985559664,4.78656764837933,Pinching4StateKind::PositiveEnvelope}};
 
     double work=0.0,previous_force=0.0,previous_deformation=0.0;
-    for(int step=0;step<=140;++step){
+    for(int step=0;step<=160;++step){
         const double deformation=protocol[static_cast<std::size_t>(step)];
-        if(step==121){
+        if(step==121||step==141){
             const auto a=m.trial(deformation,state),b=m.trial(deformation,state);
-            near(a.response.force,b.response.force,1e-13,"Pinching4 step140 trial purity");
-            check(state.kind==Pinching4StateKind::PositiveEnvelope,"Pinching4 step140 trial mutated committed state");
+            near(a.response.force,b.response.force,1e-13,"Pinching4 focused trial purity");
+            const auto expected=step==121?Pinching4StateKind::PositiveEnvelope:Pinching4StateKind::NegativeEnvelope;
+            check(state.kind==expected,"Pinching4 focused trial mutated committed state");
         }
         const auto trial=m.trial(deformation,state);
         if(step>0)work+=0.5*(previous_force+trial.response.force)*(deformation-previous_deformation);
         for(const auto& point:points)if(point.step==step){
-            near(trial.response.force,point.force,1e-11,"Pinching4 step140 force oracle");
-            near(trial.response.tangent,point.tangent,1e-11,"Pinching4 step140 tangent oracle");
-            near(work,point.work,1e-10,"Pinching4 step140 work oracle");
-            check(trial.state.kind==point.kind,"Pinching4 step140 state mismatch");
+            near(trial.response.force,point.force,1e-11,"Pinching4 focused force oracle");
+            near(trial.response.tangent,point.tangent,1e-11,"Pinching4 focused tangent oracle");
+            near(work,point.work,1e-10,"Pinching4 focused work oracle");
+            check(trial.state.kind==point.kind,"Pinching4 focused state mismatch");
         }
         previous_force=trial.response.force;
         previous_deformation=deformation;
         state=trial.state;
     }
-    check(state.reversal_count==3,"Pinching4 step140 reversal history mismatch");
-    rejects([&]{(void)m.trial(-0.00965,state);});
-    std::cout<<"Pinching4 frozen steel_raw parity through step 140 passed\n";
+    check(state.reversal_count==4,"Pinching4 step160 reversal history mismatch");
+    rejects([&]{(void)m.trial(0.0315,state);});
+    std::cout<<"Pinching4 frozen steel_raw parity through step 160 passed\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
