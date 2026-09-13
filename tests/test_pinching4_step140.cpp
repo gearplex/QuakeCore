@@ -39,8 +39,8 @@ Pinching4 steel_material(){
 
 Pinching4 shear_material(){
     Pinching4CyclicParameters p{};
-    p.envelope.positive={{{0.00010787,171.319},{0.288,285.531},{0.72,299.808},{1.2,138.0068}}};
-    p.envelope.negative={{{-0.00010787,-171.319},{-0.288,-285.531},{-0.72,-299.808},{-1.2,-138.0068}}};
+    p.envelope.positive={{{0.00010787,171.319},{0.288,285.531},{0.72,299.808},{1.44,57.1062}}};
+    p.envelope.negative={{{-0.00010787,-171.319},{-0.288,-285.531},{-0.72,-299.808},{-1.44,-57.1062}}};
     p.r_disp_positive=p.r_disp_negative=0.6;
     p.r_force_positive=p.r_force_negative=0.99;
     p.u_force_positive=p.u_force_negative=0.4;
