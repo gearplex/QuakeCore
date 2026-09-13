@@ -10,8 +10,8 @@ void near(double x,double y,double tol,const char* why){check(std::isfinite(x)&&
 
 Pinching4CyclicParameters yori_steel(){
     Pinching4CyclicParameters p{};
-    p.envelope={{{{0.00204828,59.4},{0.00705517,66.66},{0.0523366,75.9},{0.0654208,33.0}}},
-                {{{-0.00204828,-59.4},{-0.00705517,-66.66},{-0.0523366,-75.9},{-0.0654208,-33.0}}}}};
+    p.envelope.positive={{{0.00204828,59.4},{0.00705517,66.66},{0.0523366,75.9},{0.0654208,33.0}}};
+    p.envelope.negative={{{-0.00204828,-59.4},{-0.00705517,-66.66},{-0.0523366,-75.9},{-0.0654208,-33.0}}};
     p.r_disp_positive=p.r_disp_negative=0.6;p.r_force_positive=p.r_force_negative=0.99;p.u_force_positive=p.u_force_negative=0.4;
     p.gamma_d={0.1,0.0,0.0,0.0};p.gamma_d_limit=2.0;p.gamma_e=10000.0;p.damage_mode=Pinching4DamageMode::Energy;p.admitted_reversal_count=10;
     return p;
