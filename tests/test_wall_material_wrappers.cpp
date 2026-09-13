@@ -23,6 +23,26 @@ std::vector<double> steel_protocol(){
     segment(-.012,.035);segment(.035,-.035);segment(-.035,.060);segment(.060,-.060);segment(-.060,.080);segment(.080,-.080);segment(-.080,0.0);
     return v;
 }
+ConcreteCMParameters yori_concrete(double fc,double epsc,double Ec,double xcrn,double ft){
+    return {fc,epsc,Ec,7.0,xcrn,ft,2.0*ft/Ec,1.2,10000.0,true};
+}
+std::vector<double> concrete_protocol(){
+    std::vector<double> v{0.0};
+    const double targets[]={-.0005,-.002,-.004,-.001,.0002,.001,.0025,0,-.006,-.012,-.002,0};
+    for(double target:targets){double start=v.back();for(int i=1;i<=20;++i)v.push_back(start+(target-start)*i/20.0);}
+    return v;
+}
+void verify_concrete_bridge(const ConcreteCMParameters& p){
+    ConcreteCM direct(p);auto ds=direct.initial_state();
+    auto wall=WallUniaxial::concrete_cm(p);check(wall.state_size()==28,"ConcreteCM wall state size");near(wall.initial_tangent(),p.Ec,1e-12,"ConcreteCM wall initial tangent");
+    std::vector<double> ws(wall.state_size()),wt(wall.state_size());wall.initialize(ws.data());
+    const auto protocol=concrete_protocol();check(protocol.size()==241,"ConcreteCM bridge protocol size");
+    for(double strain:protocol){
+        const auto dr=direct.trial(strain,ds);const auto wr=wall.trial(strain,ws.data(),wt.data());
+        near(wr.stress,dr.response.stress,1e-11,"ConcreteCM wall bridge stress");near(wr.tangent,dr.response.tangent,1e-11,"ConcreteCM wall bridge tangent");
+        ds=dr.state;ws=wt;
+    }
+}
 int main(){try{
     auto par=WallUniaxial::parallel({WallUniaxial::elastic(100),WallUniaxial::elastic(20)});
     check(par.state_size()==12,"parallel state size");near(par.initial_tangent(),120,1e-12,"parallel initial tangent");
@@ -36,6 +56,9 @@ int main(){try{
     auto n1=nested.trial(.01,ns.data(),nt.data());near(n1.stress,1.18,1e-12,"nested intact stress");near(n1.tangent,118,1e-12,"nested intact tangent");
     auto nf=nested.trial(.021,ns.data(),nt.data());near(nf.stress,.378,1e-12,"nested fail stress");near(nf.tangent,18.000001,1e-12,"nested fail tangent");auto ncomm=nt;auto n2=nested.trial(.01,ncomm.data(),nt.data());near(n2.stress,.18,1e-12,"nested permanent branch stress");near(n2.tangent,18.000001,1e-12,"nested permanent branch tangent");
     WallPanel panel(0,.2,{{0,1,nested},{1.5707963267948966,1,WallUniaxial::elastic(5)}});check(panel.state_size()==19,"panel dynamic state size");auto ps=panel.initial_state();auto pv=panel.trial({.01,0,0},ps.data());near(pv.stress[0],1.18,1e-12,"panel wrapper stress");
+
+    verify_concrete_bridge(yori_concrete(-6.5,-.002,4595.486916530173,1.030,.0604669));
+    verify_concrete_bridge(yori_concrete(-8.01435,-.00432976,5102.805419570689,1.015,.0671422));
 
     // Gate 4 integration seam: Pinching4 composes through MinMax + Parallel.
     // The exact received MinMax limits are unavailable because the source
@@ -60,5 +83,5 @@ int main(){try{
     }
     check(protocol.size()==281,"wrapped full protocol size");
     auto post=wrapped.trial(.01,ws.data(),wt.data());near(post.stress,.0001,1e-12,"wrapped permanent failure stress");near(post.tangent,.010289999414142598,1e-12,"wrapped permanent failure tangent");
-    std::cout<<"wrapper state, full sampled Pinching4-MinMax-Parallel lifecycle, rollback, and failure checks passed\n";return 0;
+    std::cout<<"wall material bridges, full sampled Pinching4-MinMax-Parallel lifecycle, rollback, and failure checks passed\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
