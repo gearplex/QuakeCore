@@ -8,6 +8,19 @@
 namespace quake {
 namespace {
 void positive(double x) { if(!std::isfinite(x)||x<=0)throw std::invalid_argument("wall material modulus/strength must be finite and positive"); }
+constexpr int pinching4_state_size=17;
+void encode_pinching4_state(const Pinching4State& s,double* v){
+    v[0]=static_cast<int>(s.kind);v[1]=s.deformation;v[2]=s.force;v[3]=s.tangent;v[4]=s.deformation_rate;
+    v[5]=s.low_state_deformation;v[6]=s.low_state_force;v[7]=s.high_state_deformation;v[8]=s.high_state_force;
+    v[9]=s.min_demand;v[10]=s.max_demand;v[11]=s.energy;v[12]=s.gamma_d;v[13]=s.cycles;v[14]=s.damaged_min;v[15]=s.damaged_max;
+    v[16]=static_cast<double>(s.reversal_count);
+}
+Pinching4State decode_pinching4_state(const double* v){
+    Pinching4State s;s.kind=static_cast<Pinching4StateKind>(static_cast<int>(v[0]));s.deformation=v[1];s.force=v[2];s.tangent=v[3];s.deformation_rate=v[4];
+    s.low_state_deformation=v[5];s.low_state_force=v[6];s.high_state_deformation=v[7];s.high_state_force=v[8];
+    s.min_demand=v[9];s.max_demand=v[10];s.energy=v[11];s.gamma_d=v[12];s.cycles=v[13];s.damaged_min=v[14];s.damaged_max=v[15];
+    s.reversal_count=static_cast<unsigned>(v[16]);return s;
+}
 }
 WallUniaxial WallUniaxial::elastic(double E) { positive(E);WallUniaxial m;m.E_=E;return m; }
 WallUniaxial WallUniaxial::steel(double E,double fy,double b) {
@@ -18,6 +31,11 @@ WallUniaxial WallUniaxial::concrete01(double fc,double ec,double fu,double eu) {
     if(!std::isfinite(fc)||!std::isfinite(ec)||!std::isfinite(fu)||!std::isfinite(eu)||fc>=0||ec>=0||fu>0||fu<fc||eu>=ec)
         throw std::invalid_argument("concrete01 requires fc<0, epsc<0, fc<=fcu<=0, epsu<epsc");
     WallUniaxial m;m.kind_=Kind::Concrete01;m.fc_=fc;m.ec_=ec;m.fu_=fu;m.eu_=eu;m.E_=2*fc/ec;positive(m.E_);return m;
+}
+WallUniaxial WallUniaxial::pinching4(Pinching4CyclicParameters parameters) {
+    Pinching4 material(parameters);
+    WallUniaxial m;m.kind_=Kind::Pinching4;m.pinching4_parameters_=std::make_shared<const Pinching4CyclicParameters>(std::move(parameters));
+    m.E_=material.initial_state().tangent;return m;
 }
 WallUniaxial WallUniaxial::minmax(WallUniaxial material,double min_strain,double max_strain) {
     if(!std::isfinite(min_strain)||!std::isfinite(max_strain)||min_strain>=max_strain)
@@ -35,11 +53,13 @@ double WallUniaxial::initial_tangent() const {
     return E_;
 }
 int WallUniaxial::state_size() const {
+    if(kind_==Kind::Pinching4)return pinching4_state_size;
     if(kind_==Kind::MinMax){const int n=children_->front().state_size();if(n==std::numeric_limits<int>::max())throw std::overflow_error("wall material state size overflow");return n+1;}
     if(kind_==Kind::Parallel){int n=0;for(const auto& child:*children_){const int c=child.state_size();if(c>std::numeric_limits<int>::max()-n)throw std::overflow_error("wall material state size overflow");n+=c;}return n;}
     return 6;
 }
 void WallUniaxial::initialize(double* s) const {
+    if(kind_==Kind::Pinching4){encode_pinching4_state(Pinching4(*pinching4_parameters_).initial_state(),s);return;}
     if(kind_==Kind::MinMax){const auto& child=children_->front();child.initialize(s);s[child.state_size()]=0;return;}
     if(kind_==Kind::Parallel){int o=0;for(const auto& child:*children_){child.initialize(s+o);o+=child.state_size();}return;}
     std::fill(s,s+6,0.0);if(kind_==Kind::Concrete01)s[2]=E_;
@@ -47,6 +67,7 @@ void WallUniaxial::initialize(double* s) const {
 WallUniaxial::Result WallUniaxial::trial(double e,const double* s,double* t) const {
     if(!std::isfinite(e))throw std::invalid_argument("nonfinite wall material strain");
     const int nstate=state_size();for(int i=0;i<nstate;++i)if(!std::isfinite(s[i]))throw std::invalid_argument("nonfinite wall material state");
+    if(kind_==Kind::Pinching4){const auto r=Pinching4(*pinching4_parameters_).trial(e,decode_pinching4_state(s));encode_pinching4_state(r.state,t);return {r.response.force,r.response.tangent};}
     if(kind_==Kind::MinMax){
         const auto& child=children_->front();const int n=child.state_size();std::copy(s,s+n+1,t);
         // Match OpenSees MinMaxMaterial exactly: the limits themselves fail,
