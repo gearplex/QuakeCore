@@ -50,10 +50,10 @@ new = '''        if (strain > committed.strain) {
                 return positive_path_trial(envelope_, reversal, strain);
             }
 
-            // OpenSees 3.8.0 Crule=77, Cstrain>=Teunn.  Tea is the original
+            // OpenSees 3.8.0 Crule=77, Cstrain>=Teunn. Tea is the original
             // rule-77 reversal strain (Ter0n); rule 12 transitions from the
-            // current reversal point (Ter/Tfr) to the response of the existing
-            // positive path at Tea, with Ec as the initial tangent.
+            // current reversal point (Ter/Tfr) to the existing positive path
+            // at Tea, with Ec as the initial tangent.
             ConcreteCMState reversal = committed;
             reversal.nested_positive_origin_strain = committed.strain;
             reversal.nested_positive_origin_stress = committed.stress;
@@ -108,3 +108,31 @@ if text.count(anchor) != 1:
     raise SystemExit("expected first_rebound anchor not found exactly once")
 text = text.replace(anchor, insert + anchor)
 path.write_text(text)
+
+wall_path = Path("src/wall_material.cpp")
+wall = wall_path.read_text()
+old_size = "constexpr int concrete_cm_state_size=28;"
+if wall.count(old_size) != 1:
+    raise SystemExit("expected ConcreteCM state-size anchor not found exactly once")
+wall = wall.replace(old_size, "constexpr int concrete_cm_state_size=31;", 1)
+
+old_encode = "    v[27]=s.has_second_negative_to_positive_reversal?1.0:0.0;\n"
+new_encode = (
+    "    v[27]=s.has_second_negative_to_positive_reversal?1.0:0.0;\n"
+    "    v[28]=s.nested_positive_origin_strain;v[29]=s.nested_positive_origin_stress;"
+    "v[30]=s.nested_positive_target_strain;\n"
+)
+if wall.count(old_encode) != 1:
+    raise SystemExit("expected ConcreteCM encode anchor not found exactly once")
+wall = wall.replace(old_encode, new_encode, 1)
+
+old_decode = "    s.has_second_negative_to_positive_reversal=v[27]!=0.0;return s;\n"
+new_decode = (
+    "    s.has_second_negative_to_positive_reversal=v[27]!=0.0;"
+    "s.nested_positive_origin_strain=v[28];s.nested_positive_origin_stress=v[29];"
+    "s.nested_positive_target_strain=v[30];return s;\n"
+)
+if wall.count(old_decode) != 1:
+    raise SystemExit("expected ConcreteCM decode anchor not found exactly once")
+wall = wall.replace(old_decode, new_decode, 1)
+wall_path.write_text(wall)
