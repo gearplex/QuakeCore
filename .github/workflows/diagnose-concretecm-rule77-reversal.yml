@@ -1,0 +1,54 @@
+name: diagnose-concretecm-rule77-reversal
+on:
+  push:
+    branches: [phase9m-yori-wall-10001]
+    paths: [.github/workflows/diagnose-concretecm-rule77-reversal.yml]
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Distinguish OpenSees rule77 reversal sub-branch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/concrete_cm.cpp')
+          s = p.read_text()
+          old = '''    if (committed.rule == ConcreteCMRule::CompressionReversalTransition) {
+        if (strain > committed.strain) {
+            throw std::logic_error(
+                "ConcreteCM reversal from rule77 is not yet admitted in Gate 4");
+        }
+        return rule77_trial(envelope_, committed, strain);
+    }
+'''
+          new = '''    if (committed.rule == ConcreteCMRule::CompressionReversalTransition) {
+        if (strain > committed.strain) {
+            if (committed.strain < committed.unloading_strain) {
+                throw std::logic_error(
+                    "ConcreteCM rule77 positive reversal: Cstrain < Teunn (post-prior-compression-extreme branch)");
+            }
+            throw std::logic_error(
+                "ConcreteCM rule77 positive reversal: Cstrain >= Teunn (nested targeting branch)");
+        }
+        return rule77_trial(envelope_, committed, strain);
+    }
+'''
+          if old not in s:
+              raise SystemExit('target guard not found')
+          p.write_text(s.replace(old, new))
+          PY
+      - name: Install solver dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
+      - name: Build QuakeCore
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUAKE_ENABLE_SANITIZERS=OFF
+          cmake --build build -j2
+      - name: Materialize reconstructed exact-law job
+        run: |
+          python validation/yori_wall_10001/materialize_reconstructed_job.py \
+            --model-input validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt \
+            --output reconstructed_job.json
+      - name: Run diagnostic system history
+        run: ./build/quake_run reconstructed_job.json quake_reconstructed.json
