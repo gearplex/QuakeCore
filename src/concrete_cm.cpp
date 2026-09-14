@@ -538,8 +538,12 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
 
     if (committed.rule == ConcreteCMRule::CompressionReversalTransition) {
         if (strain > committed.strain) {
+            if (committed.strain < committed.unloading_strain) {
+                throw std::logic_error(
+                    "ConcreteCM rule77 positive reversal: Cstrain < Teunn");
+            }
             throw std::logic_error(
-                "ConcreteCM reversal from rule77 is not yet admitted in Gate 4");
+                "ConcreteCM rule77 positive reversal: Cstrain >= Teunn");
         }
         return rule77_trial(envelope_, committed, strain);
     }
