@@ -31,6 +31,7 @@ enum class ConcreteCMRule : int {
     TensionRejoining = 8,
     CompressionToTension = 9,
     TensionToCompression = 10,
+    NestedPositiveTarget = 12,
     CompressionReversalTransition = 77,
 };
 
@@ -73,6 +74,13 @@ struct ConcreteCMState {
     double compression_rejoin_stress{};
     double compression_rejoin_tangent{};
 
+    // OpenSees rule-12 transition created when rule 77 reverses before the
+    // prior compression unloading point is exceeded. The origin and target
+    // remain fixed while the material advances toward the positive path.
+    double nested_positive_origin_strain{};
+    double nested_positive_origin_stress{};
+    double nested_positive_target_strain{};
+
     // Second negative-to-positive reversal. Gate 4 currently admits only
     // the retained-prior-tension-history branch exercised by the frozen
     // YORi story-1 ConcreteCM protocol. Deeper nested reversals remain out
@@ -99,9 +107,9 @@ private:
 
 // Incremental Gate 4 ConcreteCM state machine. The admitted cyclic scope
 // covers the complete frozen YORi story-1 protocol plus the OpenSees rule-77
-// reversal from compression unloading needed by the reconstructed 10001
-// system path. Deeper nested reversals remain rejected until independently
-// admitted against an OpenSees 3.8.0 oracle.
+// reversal paths needed by the reconstructed 10001 system path. Deeper
+// nested reversals remain rejected until independently admitted against an
+// OpenSees 3.8.0 oracle.
 class ConcreteCM {
 public:
     explicit ConcreteCM(ConcreteCMParameters parameters);
