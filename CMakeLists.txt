@@ -41,7 +41,6 @@ add_library(quake_core
     src/frame2d.cpp
     src/wall_material.cpp
     src/concrete_cm.cpp
-    src/concrete_cm_rule77_post_extreme.cpp
     src/wall2d.cpp
     src/steel2d.cpp
     src/soil2d.cpp
@@ -59,7 +58,6 @@ add_library(quake_core
     src/stability.cpp
     src/static_analysis.cpp
 )
-set_source_files_properties(src/concrete_cm.cpp PROPERTIES COMPILE_DEFINITIONS QUAKE_CONCRETE_CM_RENAME_TRIAL)
 target_include_directories(quake_core PUBLIC include)
 if(SUPERLU_INCLUDE_DIR)
   target_include_directories(quake_core PRIVATE ${SUPERLU_INCLUDE_DIR})
