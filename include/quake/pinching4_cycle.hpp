@@ -83,7 +83,13 @@ private:
             if(c.deformation>t.max_demand)t.max_demand=c.deformation;
             if(t.max_demand<t.damaged_max)t.max_demand=t.damaged_max;
             if(u<t.damaged_min){to_negative_envelope(t);}else{t.kind=Pinching4StateKind::PositiveToNegative;t.low_state_deformation=t.damaged_min;t.low_state_force=env_.negative(t.damaged_min).force;t.high_state_deformation=c.deformation;t.high_state_force=c.force;}return;}
-        if(t.kind==Pinching4StateKind::PositiveToNegative){if(u<t.low_state_deformation)to_negative_envelope(t);else if(du>0.0)throw std::logic_error("Pinching4 reversal from state 3 is not yet admitted in Gate 4");return;}
+        if(t.kind==Pinching4StateKind::PositiveToNegative){
+            if(u<t.low_state_deformation)to_negative_envelope(t);
+            else if(du>0.0){
+                if(u>t.damaged_max)to_positive_envelope(t);
+                else{t.kind=Pinching4StateKind::NegativeToPositive;t.low_state_deformation=c.deformation;t.low_state_force=c.force;t.high_state_deformation=t.damaged_max;t.high_state_force=env_.positive(t.damaged_max).force;}
+            }
+            return;}
         if(t.kind==Pinching4StateKind::NegativeEnvelope&&du>0.0){
             if(t.reversal_count>=p_.admitted_reversal_count)throw std::logic_error("Pinching4 additional negative-to-positive reversal is not yet admitted in Gate 4");
             ++t.reversal_count;
@@ -92,7 +98,10 @@ private:
             if(u>t.damaged_max){to_positive_envelope(t);}else{t.kind=Pinching4StateKind::NegativeToPositive;t.low_state_deformation=c.deformation;t.low_state_force=c.force;t.high_state_deformation=t.damaged_max;t.high_state_force=env_.positive(t.damaged_max).force;}return;}
         if(t.kind==Pinching4StateKind::NegativeToPositive){
             if(u>t.high_state_deformation)to_positive_envelope(t);
-            else if(du<0.0)throw std::logic_error("Pinching4 reversal from state 4 is not yet admitted in Gate 4");
+            else if(du<0.0){
+                if(u<t.damaged_min)to_negative_envelope(t);
+                else{t.kind=Pinching4StateKind::PositiveToNegative;t.low_state_deformation=t.damaged_min;t.low_state_force=env_.negative(t.damaged_min).force;t.high_state_deformation=c.deformation;t.high_state_force=c.force;}
+            }
         }
     }
     void to_positive_envelope(Pinching4State&t)const{const auto p=positive_points();t.kind=Pinching4StateKind::PositiveEnvelope;t.low_state_deformation=p[0].deformation;t.low_state_force=p[0].force;t.high_state_deformation=p[5].deformation;t.high_state_force=p[5].force;}
