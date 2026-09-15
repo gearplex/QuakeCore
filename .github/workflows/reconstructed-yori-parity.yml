@@ -15,6 +15,7 @@ jobs:
           python tools/apply_rule77_post_extreme_patch.py
           python tools/apply_rule10_nested_patch.py
           python tools/apply_second_rebound_diagnostic.py
+          python tools/apply_concretecm_fallback_diagnostic.py
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
         run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
