@@ -119,4 +119,48 @@ if text.count(old_rule11_continue) != 1:
     raise SystemExit("expected rule11 continuation block not found exactly once")
 text = text.replace(old_rule11_continue, new_rule11_continue, 1)
 
+# Rule identity, rather than QuakeCore's history flag, governs OpenSees Crule=10.
+# A second-rebound history can re-enter rule 10 after a nested rule-11 target.
+# Continue down the established first-negative-return path for negative motion;
+# on positive reversal, apply the same ea1112f/rule-12 construction used above.
+second_history_anchor = '''    if (committed.has_second_negative_to_positive_reversal &&
+        (committed.rule == ConcreteCMRule::CompressionUnloading ||
+'''
+second_history_rule10 = '''    if (committed.has_second_negative_to_positive_reversal &&
+        committed.rule == ConcreteCMRule::TensionToCompression) {
+        if (strain > committed.strain) {
+            ConcreteCMState reversal = committed;
+            reversal.nested_positive_origin_strain = committed.strain; // Teb
+            reversal.nested_positive_origin_stress = committed.stress;
+            reversal.nested_negative_target_strain = committed.strain; // Teb
+            const double denom =
+                committed.unloading_strain - committed.positive_zero_stress_strain;
+            reversal.nested_positive_target_strain =
+                committed.zero_stress_strain +
+                ((committed.unloading_strain - committed.strain) / denom) *
+                    (committed.tension_peak_strain - committed.zero_stress_strain); // Tea
+            const auto target = positive_path_trial(
+                envelope_, committed, reversal.nested_positive_target_strain);
+            if (strain <= reversal.nested_positive_target_strain) {
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    target.response.stress,
+                    target.response.tangent);
+                return make_trial(reversal, strain, response, 1.0,
+                                  ConcreteCMRule::NestedPositiveTarget);
+            }
+            return positive_path_trial(envelope_, reversal, strain);
+        }
+        return first_negative_return_trial(envelope_, committed, strain);
+    }
+
+'''
+if text.count(second_history_anchor) != 1:
+    raise SystemExit("expected second-rebound block anchor not found exactly once")
+text = text.replace(second_history_anchor, second_history_rule10 + second_history_anchor, 1)
+
 path.write_text(text)
