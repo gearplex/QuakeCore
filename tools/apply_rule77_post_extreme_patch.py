@@ -169,6 +169,50 @@ insert = '''    if (committed.rule == ConcreteCMRule::NestedPositiveTarget) {
 if text.count(anchor) != 1:
     raise SystemExit("expected first_rebound anchor not found exactly once")
 text = text.replace(anchor, insert + anchor)
+
+first_negative_return = '''    if (committed.has_positive_to_negative_reversal &&
+        (committed.rule == ConcreteCMRule::TensionUnloading ||
+         committed.rule == ConcreteCMRule::TensionToCompression ||
+         committed.rule == ConcreteCMRule::CompressionRejoining)) {
+        if (strain > committed.strain) {
+            throw std::logic_error(
+                "ConcreteCM reversal from the first negative return is not yet admitted in Gate 4");
+        }
+        return first_negative_return_trial(envelope_, committed, strain);
+    }
+'''
+first_negative_return_replacement = '''    if (committed.has_positive_to_negative_reversal &&
+        (committed.rule == ConcreteCMRule::TensionUnloading ||
+         committed.rule == ConcreteCMRule::TensionToCompression ||
+         committed.rule == ConcreteCMRule::CompressionRejoining)) {
+        if (strain > committed.strain) {
+            // OpenSees 3.8.0: a reversal from rule 7 follows the same
+            // negative-to-positive refresh used by rules 1/5: update eunn/funn,
+            // rebuild the shifted positive path with e0eunpfunpf, then select
+            // rules 3/9/8/2/6 at the requested strain. QuakeCore's existing
+            // second-negative-to-positive helper is the direct mapping.
+            if (committed.rule == ConcreteCMRule::CompressionRejoining) {
+                if (committed.has_second_negative_to_positive_reversal) {
+                    throw std::logic_error(
+                        "ConcreteCM deeper nested reversal is not yet admitted in Gate 4");
+                }
+                const auto reversal = second_negative_to_positive_reversal_state(
+                    envelope_, committed);
+                return positive_path_trial(envelope_, reversal, strain);
+            }
+            if (committed.rule == ConcreteCMRule::TensionUnloading) {
+                throw std::logic_error(
+                    "ConcreteCM positive reversal from rule4 is not yet admitted in Gate 4");
+            }
+            throw std::logic_error(
+                "ConcreteCM positive reversal from rule10 is not yet admitted in Gate 4");
+        }
+        return first_negative_return_trial(envelope_, committed, strain);
+    }
+'''
+if text.count(first_negative_return) != 1:
+    raise SystemExit("expected first-negative-return guard not found exactly once")
+text = text.replace(first_negative_return, first_negative_return_replacement)
 path.write_text(text)
 
 wall_path = Path("src/wall_material.cpp")
