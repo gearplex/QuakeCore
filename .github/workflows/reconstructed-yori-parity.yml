@@ -1,0 +1,45 @@
+name: reconstructed-yori-parity
+on:
+  push:
+    branches: [phase9m-yori-wall-10001]
+  pull_request:
+    branches: [main]
+
+jobs:
+  exact-surrogate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply candidate ConcreteCM rule77 post-extreme patch
+        run: python tools/apply_rule77_post_extreme_patch.py
+      - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
+      - name: Install OpenSeesPy 3.8.0
+        run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
+      - name: Build QuakeCore
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUAKE_ENABLE_SANITIZERS=OFF
+          cmake --build build -j2
+      - name: Materialize reconstructed exact-law job
+        run: |
+          python validation/yori_wall_10001/materialize_reconstructed_job.py \
+            --model-input validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt \
+            --output reconstructed_job.json
+      - name: Run QuakeCore reconstructed exact-law job
+        run: ./build/quake_run reconstructed_job.json quake_reconstructed.json
+      - name: Compare to independent OpenSeesPy 3.8.0 model
+        run: |
+          python validation/yori_wall_10001/compare_reconstructed_exact_10001.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --out reconstructed_comparison \
+            --assert-parity
+      - name: Upload reconstructed parity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconstructed-yori-parity
+          path: |
+            reconstructed_job.json
+            quake_reconstructed.json
+            reconstructed_comparison/
+          if-no-files-found: warn

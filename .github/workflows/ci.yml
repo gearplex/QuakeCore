@@ -11,6 +11,14 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUAKE_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
       - run: cmake --build build -j2
-      - run: ctest --test-dir build --output-on-failure
+      - name: CTest
+        run: ctest --test-dir build --output-on-failure
+      - name: Upload CTest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-${{ matrix.sanitizers }}
+          path: build/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
       - name: Smoke benchmark
         run: ./build/low_rank_bench 20 20 10 3
