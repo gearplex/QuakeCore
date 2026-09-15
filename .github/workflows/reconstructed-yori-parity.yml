@@ -18,7 +18,7 @@ jobs:
       - name: Build QuakeCore
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUAKE_ENABLE_SANITIZERS=OFF
-          cmake --build build -j2
+          cmake --build build -j2 --target quake_run
       - name: Materialize reconstructed exact-law job
         run: |
           python validation/yori_wall_10001/materialize_reconstructed_job.py \
