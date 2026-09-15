@@ -51,13 +51,14 @@ new = '''        if (strain > committed.strain) {
             }
 
             // OpenSees 3.8.0 Crule=77, Cstrain>=Teunn. Tea is the original
-            // rule-77 reversal strain (Ter0n); rule 12 transitions from the
-            // current reversal point (Ter/Tfr) to the existing positive path
-            // at Tea, with Ec as the initial tangent.
+            // rule-77 reversal strain (Ter0n), while Teb is this reversal
+            // point. Rule 12 transitions from Ter/Tfr to Tea with Ec as the
+            // initial tangent; Tea and Teb remain fixed across nested cycles.
             ConcreteCMState reversal = committed;
-            reversal.nested_positive_origin_strain = committed.strain; // Teb
+            reversal.nested_positive_origin_strain = committed.strain;
             reversal.nested_positive_origin_stress = committed.stress;
             reversal.nested_positive_target_strain = committed.positive_reversal_strain; // Tea=Ter0n
+            reversal.nested_negative_target_strain = committed.strain; // Teb
             const auto target = positive_path_trial(
                 envelope_, committed, reversal.nested_positive_target_strain);
             if (strain <= reversal.nested_positive_target_strain) {
@@ -87,11 +88,11 @@ insert = '''    if (committed.rule == ConcreteCMRule::NestedPositiveTarget) {
         if (strain < committed.strain) {
             // OpenSees 3.8.0 Crule=12 reversal for the rule77->12 provenance:
             // Tea == Ter0n and Teb is the saved rule-77 reversal point. The
-            // negative reversal creates rule 11 from the current point to Teb.
+            // negative reversal creates rule 11 from current Ter/Tfr to Teb.
             ConcreteCMState reversal = committed;
             reversal.nested_negative_origin_strain = committed.strain;
             reversal.nested_negative_origin_stress = committed.stress;
-            const double target_strain = committed.nested_positive_origin_strain; // Teb
+            const double target_strain = committed.nested_negative_target_strain; // Teb
             const auto target = rule77_trial(envelope_, committed, target_strain);
             if (strain >= target_strain) {
                 const auto response = smooth_transition(
@@ -123,12 +124,32 @@ insert = '''    if (committed.rule == ConcreteCMRule::NestedPositiveTarget) {
     }
 
     if (committed.rule == ConcreteCMRule::NestedNegativeTarget) {
+        const double target_strain = committed.nested_negative_target_strain; // Teb
+        const auto negative_target = rule77_trial(
+            envelope_, committed, target_strain);
         if (strain > committed.strain) {
-            throw std::logic_error(
-                "ConcreteCM reversal from rule11 is not yet admitted in Gate 4");
+            // OpenSees 3.8.0 Crule=11 positive reversal for this provenance:
+            // keep Tea/Teb fixed, move Ter/Tfr to the current point, and
+            // create rule 12 targeting Tea on the established positive path.
+            ConcreteCMState reversal = committed;
+            reversal.nested_positive_origin_strain = committed.strain;
+            reversal.nested_positive_origin_stress = committed.stress;
+            const auto positive_target = positive_path_trial(
+                envelope_, committed, committed.nested_positive_target_strain);
+            if (strain <= committed.nested_positive_target_strain) {
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    committed.nested_positive_target_strain,
+                    positive_target.response.stress,
+                    positive_target.response.tangent);
+                return make_trial(reversal, strain, response, 1.0,
+                                  ConcreteCMRule::NestedPositiveTarget);
+            }
+            return positive_path_trial(envelope_, reversal, strain);
         }
-        const double target_strain = committed.nested_positive_origin_strain; // Teb
-        const auto target = rule77_trial(envelope_, committed, target_strain);
         if (strain >= target_strain) {
             const auto response = smooth_transition(
                 strain,
@@ -136,8 +157,8 @@ insert = '''    if (committed.rule == ConcreteCMRule::NestedPositiveTarget) {
                 committed.nested_negative_origin_stress,
                 parameters().Ec,
                 target_strain,
-                target.response.stress,
-                target.response.tangent);
+                negative_target.response.stress,
+                negative_target.response.tangent);
             return make_trial(committed, strain, response, -1.0,
                               ConcreteCMRule::NestedNegativeTarget);
         }
@@ -155,14 +176,15 @@ wall = wall_path.read_text()
 old_size = "constexpr int concrete_cm_state_size=28;"
 if wall.count(old_size) != 1:
     raise SystemExit("expected ConcreteCM state-size anchor not found exactly once")
-wall = wall.replace(old_size, "constexpr int concrete_cm_state_size=33;", 1)
+wall = wall.replace(old_size, "constexpr int concrete_cm_state_size=34;", 1)
 
 old_encode = "    v[27]=s.has_second_negative_to_positive_reversal?1.0:0.0;\n"
 new_encode = (
     "    v[27]=s.has_second_negative_to_positive_reversal?1.0:0.0;\n"
     "    v[28]=s.nested_positive_origin_strain;v[29]=s.nested_positive_origin_stress;"
     "v[30]=s.nested_positive_target_strain;\n"
-    "    v[31]=s.nested_negative_origin_strain;v[32]=s.nested_negative_origin_stress;\n"
+    "    v[31]=s.nested_negative_origin_strain;v[32]=s.nested_negative_origin_stress;"
+    "v[33]=s.nested_negative_target_strain;\n"
 )
 if wall.count(old_encode) != 1:
     raise SystemExit("expected ConcreteCM encode anchor not found exactly once")
@@ -173,7 +195,8 @@ new_decode = (
     "    s.has_second_negative_to_positive_reversal=v[27]!=0.0;"
     "s.nested_positive_origin_strain=v[28];s.nested_positive_origin_stress=v[29];"
     "s.nested_positive_target_strain=v[30];"
-    "s.nested_negative_origin_strain=v[31];s.nested_negative_origin_stress=v[32];return s;\n"
+    "s.nested_negative_origin_strain=v[31];s.nested_negative_origin_stress=v[32];"
+    "s.nested_negative_target_strain=v[33];return s;\n"
 )
 if wall.count(old_decode) != 1:
     raise SystemExit("expected ConcreteCM decode anchor not found exactly once")

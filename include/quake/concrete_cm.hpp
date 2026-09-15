@@ -75,16 +75,13 @@ struct ConcreteCMState {
     double compression_rejoin_stress{};
     double compression_rejoin_tangent{};
 
-    // OpenSees rule-12 transition created when rule 77 reverses before the
-    // prior compression unloading point is exceeded. The origin (Teb) and
-    // positive target (Tea) remain fixed while the material advances.
+    // OpenSees nested rule-12/rule-11 history for the rule77 provenance.
+    // Tea and Teb are persistent targets across reversals; Ter/Tfr are the
+    // moving origins of the current rule 12 or rule 11 transition.
+    double nested_positive_target_strain{}; // Tea
+    double nested_negative_target_strain{}; // Teb
     double nested_positive_origin_strain{};
     double nested_positive_origin_stress{};
-    double nested_positive_target_strain{};
-
-    // OpenSees rule-11 transition created when that rule-12 path reverses
-    // negative. For the admitted rule77->12->11 provenance, rule 11 targets
-    // the stored Teb point on the prior rule-77 path.
     double nested_negative_origin_strain{};
     double nested_negative_origin_stress{};
 
