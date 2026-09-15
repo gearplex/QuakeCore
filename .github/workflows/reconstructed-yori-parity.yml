@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Apply candidate ConcreteCM rule77 post-extreme patch
-        run: python tools/apply_rule77_post_extreme_patch.py
+      - name: Apply candidate ConcreteCM patches
+        run: |
+          python tools/apply_rule77_post_extreme_patch.py
+          python tools/apply_rule10_nested_patch.py
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
         run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
