@@ -8,8 +8,12 @@ old = '''        if (strain < committed.strain) {
         }
 '''
 new = '''        if (strain < committed.strain) {
+            // OpenSees 3.8.0 Crule=3 negative reversal: capture the current
+            // rule-3 point as Ter0n/Tfr0n, recompute the shortened negative
+            // rejoin landmarks, then follow rule 77 or the compression envelope.
             if (committed.rule == ConcreteCMRule::CompressionUnloading) {
-                throw std::logic_error("ConcreteCM second rebound negative reversal from rule3");
+                const auto reversal = rule77_reversal_state(envelope_, committed);
+                return rule77_trial(envelope_, reversal, strain);
             }
             if (committed.rule == ConcreteCMRule::CompressionToTension) {
                 throw std::logic_error("ConcreteCM second rebound negative reversal from rule9");
