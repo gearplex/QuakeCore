@@ -170,22 +170,12 @@ if text.count(anchor) != 1:
     raise SystemExit("expected first_rebound anchor not found exactly once")
 text = text.replace(anchor, insert + anchor)
 
-first_negative_return = '''    if (committed.has_positive_to_negative_reversal &&
-        (committed.rule == ConcreteCMRule::TensionUnloading ||
-         committed.rule == ConcreteCMRule::TensionToCompression ||
-         committed.rule == ConcreteCMRule::CompressionRejoining)) {
-        if (strain > committed.strain) {
+first_negative_guard = '''        if (strain > committed.strain) {
             throw std::logic_error(
                 "ConcreteCM reversal from the first negative return is not yet admitted in Gate 4");
         }
-        return first_negative_return_trial(envelope_, committed, strain);
-    }
 '''
-first_negative_return_replacement = '''    if (committed.has_positive_to_negative_reversal &&
-        (committed.rule == ConcreteCMRule::TensionUnloading ||
-         committed.rule == ConcreteCMRule::TensionToCompression ||
-         committed.rule == ConcreteCMRule::CompressionRejoining)) {
-        if (strain > committed.strain) {
+first_negative_guard_replacement = '''        if (strain > committed.strain) {
             // OpenSees 3.8.0: a reversal from rule 7 follows the same
             // negative-to-positive refresh used by rules 1/5: update eunn/funn,
             // rebuild the shifted positive path with e0eunpfunpf, then select
@@ -207,12 +197,10 @@ first_negative_return_replacement = '''    if (committed.has_positive_to_negativ
             throw std::logic_error(
                 "ConcreteCM positive reversal from rule10 is not yet admitted in Gate 4");
         }
-        return first_negative_return_trial(envelope_, committed, strain);
-    }
 '''
-if text.count(first_negative_return) != 1:
-    raise SystemExit("expected first-negative-return guard not found exactly once")
-text = text.replace(first_negative_return, first_negative_return_replacement)
+if text.count(first_negative_guard) != 1:
+    raise SystemExit("expected first-negative-return reversal guard not found exactly once")
+text = text.replace(first_negative_guard, first_negative_guard_replacement)
 path.write_text(text)
 
 wall_path = Path("src/wall_material.cpp")
