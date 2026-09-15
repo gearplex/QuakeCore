@@ -31,6 +31,7 @@ enum class ConcreteCMRule : int {
     TensionRejoining = 8,
     CompressionToTension = 9,
     TensionToCompression = 10,
+    NestedNegativeTarget = 11,
     NestedPositiveTarget = 12,
     CompressionReversalTransition = 77,
 };
@@ -75,11 +76,17 @@ struct ConcreteCMState {
     double compression_rejoin_tangent{};
 
     // OpenSees rule-12 transition created when rule 77 reverses before the
-    // prior compression unloading point is exceeded. The origin and target
-    // remain fixed while the material advances toward the positive path.
+    // prior compression unloading point is exceeded. The origin (Teb) and
+    // positive target (Tea) remain fixed while the material advances.
     double nested_positive_origin_strain{};
     double nested_positive_origin_stress{};
     double nested_positive_target_strain{};
+
+    // OpenSees rule-11 transition created when that rule-12 path reverses
+    // negative. For the admitted rule77->12->11 provenance, rule 11 targets
+    // the stored Teb point on the prior rule-77 path.
+    double nested_negative_origin_strain{};
+    double nested_negative_origin_stress{};
 
     // Second negative-to-positive reversal. Gate 4 currently admits only
     // the retained-prior-tension-history branch exercised by the frozen
