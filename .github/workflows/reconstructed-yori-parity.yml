@@ -5,59 +5,11 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   exact-surrogate:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Apply candidate ConcreteCM patches
-        run: |
-          python tools/apply_rule77_post_extreme_patch.py
-          python tools/apply_rule10_fix2_patch.py
-          python tools/apply_rule10_nested_patch.py
-          python tools/apply_teunp_history_patch.py
-          python tools/apply_rule88_negative_patch.py
-          python tools/apply_rule9_negative_patch.py
-          python tools/apply_second_rebound_diagnostic.py
-          python tools/apply_rebound_refresh_patch.py
-          python tools/apply_nested_provenance_patch.py
-          python tools/apply_rule10_universal_patch.py
-          python tools/apply_concretecm_fallback_diagnostic.py
-          python tools/apply_substep_trace_patch.py
-      - name: Capture validated runtime patch source snapshot
-        run: |
-          mkdir -p gate4_source_snapshot
-          git diff --name-only > gate4_source_snapshot/changed_files.txt
-          git diff > gate4_source_snapshot/runtime_patch.diff
-          while IFS= read -r f; do
-            if [ -f "$f" ]; then
-              mkdir -p "gate4_source_snapshot/$(dirname "$f")"
-              cp "$f" "gate4_source_snapshot/$f"
-            fi
-          done < gate4_source_snapshot/changed_files.txt
-          cat gate4_source_snapshot/changed_files.txt
-      - name: Upload runtime source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: gate4-source-snapshot
-          path: gate4_source_snapshot/
-          if-no-files-found: error
-      - name: Promote validated ConcreteCM source
-        if: github.event_name == 'push' && github.ref == 'refs/heads/phase9m-yori-wall-10001'
-        run: |
-          git checkout -- apps/quake_run.cpp
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add include/quake/concrete_cm.hpp src/concrete_cm.cpp src/wall_material.cpp
-          if git diff --cached --quiet; then
-            echo "No constitutive source changes to promote"
-          else
-            git commit -m "Gate4: promote validated ConcreteCM implementation [skip ci]"
-            git push origin HEAD:phase9m-yori-wall-10001
-          fi
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
         run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
@@ -73,7 +25,7 @@ jobs:
       - name: Run QuakeCore reconstructed exact-law job
         continue-on-error: true
         run: ./build/quake_run reconstructed_job.json quake_reconstructed.json
-      - name: Trace offending ConcreteCM fiber state
+      - name: Trace ConcreteCM fiber state
         if: always()
         continue-on-error: true
         run: |
@@ -158,5 +110,4 @@ jobs:
             reconstructed_job.json
             quake_reconstructed.json
             reconstructed_comparison/
-            gate4_source_snapshot/
           if-no-files-found: warn
