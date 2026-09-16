@@ -95,8 +95,16 @@ void WallUniaxial::initialize(double* s) const {
 WallUniaxial::Result WallUniaxial::trial(double e,const double* s,double* t) const {
     if(!std::isfinite(e))throw std::invalid_argument("nonfinite wall material strain");
     const int nstate=state_size();for(int i=0;i<nstate;++i)if(!std::isfinite(s[i]))throw std::invalid_argument("nonfinite wall material state");
-    if(kind_==Kind::ConcreteCM){const auto r=ConcreteCM(*concrete_cm_parameters_).trial(e,decode_concrete_cm_state(s));encode_concrete_cm_state(r.state,t);return {r.response.stress,r.response.tangent};}
-    if(kind_==Kind::Pinching4){const auto r=Pinching4(*pinching4_parameters_).trial(e,decode_pinching4_state(s));encode_pinching4_state(r.state,t);return {r.response.force,r.response.tangent};}
+    if(kind_==Kind::ConcreteCM){
+        const auto c=decode_concrete_cm_state(s);
+        if(e==c.strain){std::copy(s,s+nstate,t);return {c.stress,c.tangent};}
+        const auto r=ConcreteCM(*concrete_cm_parameters_).trial(e,c);encode_concrete_cm_state(r.state,t);return {r.response.stress,r.response.tangent};
+    }
+    if(kind_==Kind::Pinching4){
+        const auto c=decode_pinching4_state(s);
+        if(e==c.deformation){std::copy(s,s+nstate,t);return {c.force,c.tangent};}
+        const auto r=Pinching4(*pinching4_parameters_).trial(e,c);encode_pinching4_state(r.state,t);return {r.response.force,r.response.tangent};
+    }
     if(kind_==Kind::MinMax){
         const auto& child=children_->front();const int n=child.state_size();std::copy(s,s+n+1,t);
         // Match OpenSees MinMaxMaterial exactly: the limits themselves fail,
