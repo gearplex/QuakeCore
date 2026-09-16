@@ -24,6 +24,18 @@ jobs:
           python tools/apply_rule10_universal_patch.py
           python tools/apply_concretecm_fallback_diagnostic.py
           python tools/apply_substep_trace_patch.py
+      - name: Capture validated runtime patch source snapshot
+        run: |
+          mkdir -p gate4_source_snapshot
+          git diff --name-only > gate4_source_snapshot/changed_files.txt
+          git diff > gate4_source_snapshot/runtime_patch.diff
+          while IFS= read -r f; do
+            if [ -f "$f" ]; then
+              mkdir -p "gate4_source_snapshot/$(dirname "$f")"
+              cp "$f" "gate4_source_snapshot/$f"
+            fi
+          done < gate4_source_snapshot/changed_files.txt
+          cat gate4_source_snapshot/changed_files.txt
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
         run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
@@ -128,4 +140,5 @@ jobs:
             reconstructed_job.json
             quake_reconstructed.json
             reconstructed_comparison/
+            gate4_source_snapshot/
           if-no-files-found: warn
