@@ -20,6 +20,7 @@ jobs:
           python tools/apply_rule9_negative_patch.py
           python tools/apply_second_rebound_diagnostic.py
           python tools/apply_rebound_refresh_patch.py
+          python tools/apply_nested_provenance_patch.py
           python tools/apply_concretecm_fallback_diagnostic.py
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
