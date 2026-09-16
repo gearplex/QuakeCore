@@ -47,14 +47,22 @@ jobs:
           import json
           q=json.load(open('quake_reconstructed.json'))
           h=q['runs'][0]['history']
-          with open('wall5_fiber0_strains.txt','w') as f:
+          with open('wall5_fiber0_strains.txt','w') as f0, open('wall3_fiber7_strains.txt','w') as f7:
               for row in h:
-                  w=row['walls']['5'] if '5' in row['walls'] else row['walls'][5]
-                  f.write(f"{w['fiber_strain'][0]:.17g}\n")
+                  w5=row['walls']['5'] if '5' in row['walls'] else row['walls'][5]
+                  w3=row['walls']['3'] if '3' in row['walls'] else row['walls'][3]
+                  f0.write(f"{w5['fiber_strain'][0]:.17g}\n")
+                  f7.write(f"{w3['fiber_strain'][7]:.17g}\n")
           PY
           g++ -std=c++20 -O2 -Iinclude validation/yori_wall_10001/concrete_cm_state_trace.cpp src/concrete_cm.cpp -o concrete_cm_state_trace
           ./concrete_cm_state_trace wall5_fiber0_strains.txt reconstructed_comparison/concrete_cm_state_trace.csv
+          ./concrete_cm_state_trace wall3_fiber7_strains.txt reconstructed_comparison/wall3_fiber7_state_trace.csv \
+            -8.01435 -0.00432976 5102.805419570689 7.0 1.015 \
+            0.0671422 2.6315798655575164e-05 1.2 10000.0 1
+          echo 'wall5/fiber0 around former 6.45 s split:'
           sed -n '640,660p' reconstructed_comparison/concrete_cm_state_trace.csv
+          echo 'wall3/fiber7 around 9.57 s split:'
+          sed -n '945,970p' reconstructed_comparison/wall3_fiber7_state_trace.csv
       - name: Replay wall material histories against OpenSeesPy
         if: always()
         continue-on-error: true
