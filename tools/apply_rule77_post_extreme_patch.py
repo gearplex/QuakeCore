@@ -208,7 +208,7 @@ wall = wall_path.read_text()
 old_size = "constexpr int concrete_cm_state_size=28;"
 if wall.count(old_size) != 1:
     raise SystemExit("expected ConcreteCM state-size anchor not found exactly once")
-wall = wall.replace(old_size, "constexpr int concrete_cm_state_size=34;", 1)
+wall = wall.replace(old_size, "constexpr int concrete_cm_state_size=36;", 1)
 
 old_encode = "    v[27]=s.has_second_negative_to_positive_reversal?1.0:0.0;\n"
 new_encode = (
@@ -217,6 +217,7 @@ new_encode = (
     "v[30]=s.nested_positive_target_strain;\n"
     "    v[31]=s.nested_negative_origin_strain;v[32]=s.nested_negative_origin_stress;"
     "v[33]=s.nested_negative_target_strain;\n"
+    "    v[34]=s.positive_return_reversal_strain;v[35]=s.positive_return_reversal_stress;\n"
 )
 if wall.count(old_encode) != 1:
     raise SystemExit("expected ConcreteCM encode anchor not found exactly once")
@@ -228,7 +229,8 @@ new_decode = (
     "s.nested_positive_origin_strain=v[28];s.nested_positive_origin_stress=v[29];"
     "s.nested_positive_target_strain=v[30];"
     "s.nested_negative_origin_strain=v[31];s.nested_negative_origin_stress=v[32];"
-    "s.nested_negative_target_strain=v[33];return s;\n"
+    "s.nested_negative_target_strain=v[33];"
+    "s.positive_return_reversal_strain=v[34];s.positive_return_reversal_stress=v[35];return s;\n"
 )
 if wall.count(old_decode) != 1:
     raise SystemExit("expected ConcreteCM decode anchor not found exactly once")
