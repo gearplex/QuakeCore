@@ -50,4 +50,29 @@ if text.count(old_landmarks) != 1:
     raise SystemExit("expected second_reversal_state landmark block not found exactly once")
 text = text.replace(old_landmarks, new_landmarks, 1)
 
+# OpenSees uses the same Crule 2/8 negative-reversal block regardless of the
+# earlier cyclic provenance: Teunp/Tfunp are promoted to the current point,
+# then the return proceeds through rules 4, 10, 7, and the compression
+# envelope.  After a nested rule-12 excursion QuakeCore can therefore be on
+# rule 8 while has_positive_to_negative_reversal is already true.
+anchor = '''    if (committed.has_positive_to_negative_reversal &&
+        !committed.has_second_negative_to_positive_reversal &&
+        (committed.rule == ConcreteCMRule::TensionUnloading ||
+'''
+rule28_rereversal = '''    if (committed.has_positive_to_negative_reversal &&
+        !committed.has_second_negative_to_positive_reversal &&
+        (committed.rule == ConcreteCMRule::TensionEnvelope ||
+         committed.rule == ConcreteCMRule::TensionRejoining)) {
+        if (strain < committed.strain) {
+            const auto reversal = second_reversal_state(envelope_, committed);
+            return first_negative_return_trial(envelope_, reversal, strain);
+        }
+        return positive_path_trial(envelope_, committed, strain);
+    }
+
+'''
+if text.count(anchor) != 1:
+    raise SystemExit("expected first-negative-return dispatch anchor not found exactly once")
+text = text.replace(anchor, rule28_rereversal + anchor, 1)
+
 path.write_text(text)
