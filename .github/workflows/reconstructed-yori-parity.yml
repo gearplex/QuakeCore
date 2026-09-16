@@ -13,6 +13,7 @@ jobs:
       - name: Apply candidate ConcreteCM patches
         run: |
           python tools/apply_rule77_post_extreme_patch.py
+          python tools/apply_rule10_fix2_patch.py
           python tools/apply_rule10_nested_patch.py
           python tools/apply_second_rebound_diagnostic.py
           python tools/apply_concretecm_fallback_diagnostic.py
