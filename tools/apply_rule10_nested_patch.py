@@ -31,14 +31,25 @@ new_rule10 = '''            if (committed.rule == ConcreteCMRule::TensionUnloadi
             const auto target = positive_path_trial(
                 envelope_, committed, reversal.nested_positive_target_strain);
             if (strain <= reversal.nested_positive_target_strain) {
-                const auto response = smooth_transition(
-                    strain,
+                // OpenSees r12f first evaluates the raw transition at Tea and
+                // replaces ff/Ef with that evaluated endpoint. The caller then
+                // runs RAf again before evaluating the actual trial strain.
+                const auto normalized_target = smooth_transition(
+                    reversal.nested_positive_target_strain,
                     reversal.nested_positive_origin_strain,
                     reversal.nested_positive_origin_stress,
                     parameters().Ec,
                     reversal.nested_positive_target_strain,
                     target.response.stress,
                     target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
                 return make_trial(reversal, strain, response, 1.0,
                                   ConcreteCMRule::NestedPositiveTarget);
             }
@@ -71,14 +82,22 @@ new_rule12_negative = '''            const double target_strain = committed.nest
                 ? first_negative_return_trial(envelope_, committed, target_strain)
                 : rule77_trial(envelope_, committed, target_strain);
             if (strain >= target_strain) {
-                const auto response = smooth_transition(
-                    strain,
+                const auto normalized_target = smooth_transition(
+                    target_strain,
                     reversal.nested_negative_origin_strain,
                     reversal.nested_negative_origin_stress,
                     parameters().Ec,
                     target_strain,
                     target.response.stress,
                     target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_negative_origin_strain,
+                    reversal.nested_negative_origin_stress,
+                    parameters().Ec,
+                    target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
                 return make_trial(reversal, strain, response, -1.0,
                                   ConcreteCMRule::NestedNegativeTarget);
             }
@@ -142,14 +161,22 @@ second_history_rule10 = '''    if (committed.has_second_negative_to_positive_rev
             const auto target = positive_path_trial(
                 envelope_, committed, reversal.nested_positive_target_strain);
             if (strain <= reversal.nested_positive_target_strain) {
-                const auto response = smooth_transition(
-                    strain,
+                const auto normalized_target = smooth_transition(
+                    reversal.nested_positive_target_strain,
                     reversal.nested_positive_origin_strain,
                     reversal.nested_positive_origin_stress,
                     parameters().Ec,
                     reversal.nested_positive_target_strain,
                     target.response.stress,
                     target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
                 return make_trial(reversal, strain, response, 1.0,
                                   ConcreteCMRule::NestedPositiveTarget);
             }
