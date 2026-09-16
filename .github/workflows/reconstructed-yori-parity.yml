@@ -31,6 +31,14 @@ jobs:
       - name: Run QuakeCore reconstructed exact-law job
         continue-on-error: true
         run: ./build/quake_run reconstructed_job.json quake_reconstructed.json
+      - name: Replay wall material histories against OpenSeesPy
+        if: always()
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/diagnose_material_history_parity.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --out reconstructed_comparison/material_history_diagnostic.json
       - name: Compare to independent OpenSeesPy 3.8.0 model
         run: |
           python validation/yori_wall_10001/compare_reconstructed_exact_10001.py \
