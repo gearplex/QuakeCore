@@ -16,6 +16,7 @@ jobs:
           python tools/apply_rule10_fix2_patch.py
           python tools/apply_rule10_nested_patch.py
           python tools/apply_teunp_history_patch.py
+          python tools/apply_rule88_negative_patch.py
           python tools/apply_second_rebound_diagnostic.py
           python tools/apply_concretecm_fallback_diagnostic.py
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
