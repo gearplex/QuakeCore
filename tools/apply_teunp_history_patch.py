@@ -182,6 +182,23 @@ rule28_rereversal = '''    if (committed.has_positive_to_negative_reversal &&
         return positive_path_trial(envelope_, committed, strain);
     }
 
+    // OpenSees dispatch remains rule-driven after later rebounds.  A committed
+    // rule 4 still continues on the ordinary negative-return path; if it
+    // reverses positive, it creates a fresh Ter0p/Tfr0p and rule 88 exactly as
+    // it does on the first cycle.
+    if (committed.has_positive_to_negative_reversal &&
+        committed.has_second_negative_to_positive_reversal &&
+        committed.rule == ConcreteCMRule::TensionUnloading) {
+        if (strain > committed.strain) {
+            ConcreteCMState reversal = committed;
+            reversal.positive_return_reversal_strain = committed.strain;
+            reversal.positive_return_reversal_stress = committed.stress;
+            reversal.nested_negative_target_strain = committed.strain;
+            return rule88_trial(envelope_, reversal, strain);
+        }
+        return first_negative_return_trial(envelope_, committed, strain);
+    }
+
 '''
 if text.count(anchor) != 1:
     raise SystemExit("expected first-negative-return dispatch anchor not found exactly once")
