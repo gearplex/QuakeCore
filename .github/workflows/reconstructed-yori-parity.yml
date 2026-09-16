@@ -5,6 +5,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   exact-surrogate:
     runs-on: ubuntu-24.04
@@ -42,6 +45,19 @@ jobs:
           name: gate4-source-snapshot
           path: gate4_source_snapshot/
           if-no-files-found: error
+      - name: Promote validated ConcreteCM source
+        if: github.event_name == 'push' && github.ref == 'refs/heads/phase9m-yori-wall-10001'
+        run: |
+          git checkout -- apps/quake_run.cpp
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add include/quake/concrete_cm.hpp src/concrete_cm.cpp src/wall_material.cpp
+          if git diff --cached --quiet; then
+            echo "No constitutive source changes to promote"
+          else
+            git commit -m "Gate4: promote validated ConcreteCM implementation [skip ci]"
+            git push origin HEAD:phase9m-yori-wall-10001
+          fi
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
         run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
@@ -78,10 +94,6 @@ jobs:
           ./concrete_cm_state_trace wall3_fiber7_strains.txt reconstructed_comparison/wall3_fiber7_state_trace.csv \
             -8.01435 -0.00432976 5102.805419570689 7.0 1.015 \
             0.0671422 2.6315798655575164e-05 1.2 10000.0 1
-          echo 'wall5/fiber0 around former 6.45 s split:'
-          sed -n '640,660p' reconstructed_comparison/concrete_cm_state_trace.csv
-          echo 'wall3/fiber7 around 9.57 s split:'
-          sed -n '945,970p' reconstructed_comparison/wall3_fiber7_state_trace.csv
       - name: Replay wall material histories against OpenSeesPy
         if: always()
         continue-on-error: true
