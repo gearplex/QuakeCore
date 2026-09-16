@@ -111,6 +111,14 @@ jobs:
             --quake quake_reconstructed.json \
             --max-depth 6 \
             --out reconstructed_comparison/robust_opensees_full_record.json
+      - name: Multi-intensity engineering parity diagnostic
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/compare_reconstructed_intensity_suite.py \
+            --job reconstructed_job.json \
+            --quake-exe ./build/quake_run \
+            --scales 0.5 1.0 2.0 4.0 \
+            --out reconstructed_comparison/intensity_suite.json
       - name: Upload reconstructed parity evidence
         if: always()
         uses: actions/upload-artifact@v4
