@@ -32,6 +32,22 @@ jobs:
       - name: Run QuakeCore reconstructed exact-law job
         continue-on-error: true
         run: ./build/quake_run reconstructed_job.json quake_reconstructed.json
+      - name: Trace offending ConcreteCM fiber state
+        if: always()
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          q=json.load(open('quake_reconstructed.json'))
+          h=q['runs'][0]['history']
+          with open('wall5_fiber0_strains.txt','w') as f:
+              for row in h:
+                  w=row['walls']['5'] if '5' in row['walls'] else row['walls'][5]
+                  f.write(f"{w['fiber_strain'][0]:.17g}\n")
+          PY
+          g++ -std=c++20 -O2 -Iinclude validation/yori_wall_10001/concrete_cm_state_trace.cpp src/concrete_cm.cpp -o concrete_cm_state_trace
+          ./concrete_cm_state_trace wall5_fiber0_strains.txt reconstructed_comparison/concrete_cm_state_trace.csv
+          sed -n '640,660p' reconstructed_comparison/concrete_cm_state_trace.csv
       - name: Replay wall material histories against OpenSeesPy
         if: always()
         continue-on-error: true
