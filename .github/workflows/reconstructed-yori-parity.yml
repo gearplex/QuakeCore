@@ -103,6 +103,14 @@ jobs:
             --response-summary reconstructed_comparison/reconstructed_exact_summary.json \
             --wall-force-summary reconstructed_comparison/wall_force_edp_summary.json \
             --out reconstructed_comparison/engineering_parity_summary.json
+      - name: Robust OpenSees full-record diagnostic
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/compare_reconstructed_robust_opensees.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --max-depth 6 \
+            --out reconstructed_comparison/robust_opensees_full_record.json
       - name: Upload reconstructed parity evidence
         if: always()
         uses: actions/upload-artifact@v4
