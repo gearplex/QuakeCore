@@ -72,6 +72,14 @@ jobs:
             --job reconstructed_job.json \
             --quake quake_reconstructed.json \
             --out reconstructed_comparison/material_history_diagnostic.json
+      - name: Compare common-prefix wall force EDPs
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/compare_wall_force_edps.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --steps 1000 \
+            --out reconstructed_comparison/wall_force_edp_summary.json
       - name: Benchmark common 1000-step exact-law prefix
         run: |
           python validation/yori_wall_10001/benchmark_reconstructed_prefix.py \
