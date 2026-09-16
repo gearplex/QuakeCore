@@ -36,6 +36,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
+          mkdir -p reconstructed_comparison
           python - <<'PY'
           import json
           q=json.load(open('quake_reconstructed.json'))
