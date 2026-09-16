@@ -153,14 +153,19 @@ void verify_full_protocol(const ConcreteCM& material,
           !step200.has_second_negative_to_positive_reversal,
           "ConcreteCM step-201 pure trial mutated the supplied committed state");
 
-    bool rejected_reversal = false;
-    try {
-        (void)material.trial(-0.0001, committed);
-    } catch (const std::logic_error&) {
-        rejected_reversal = true;
-    }
-    check(rejected_reversal,
-          "ConcreteCM admitted an unvalidated reversal after the frozen protocol");
+    // Gate 4 now admits additional ConcreteCM reversal rules required by the
+    // reconstructed 10001 system path and independently exercised against
+    // OpenSees 3.8.0. Retain a unit-level purity/determinism guard here
+    // rather than rejecting every reversal beyond the original 241-point
+    // frozen component protocol.
+    const auto post_a = material.trial(-0.0001, committed);
+    const auto post_b = material.trial(-0.0001, committed);
+    check(std::isfinite(post_a.response.stress) &&
+          std::isfinite(post_a.response.tangent),
+          "ConcreteCM extended post-protocol reversal returned nonfinite response");
+    check(near(post_a.response.stress, post_b.response.stress) &&
+          near(post_a.response.tangent, post_b.response.tangent),
+          "ConcreteCM extended post-protocol trial is not deterministic");
 }
 
 } // namespace

@@ -37,7 +37,7 @@ int main(){try{
     // +/-0.075 MinMax limits remain protocol-scoped placeholders because the
     // exact received m[30]/m[31] values are not retained in the repository.
     Wall2D yori(72.0,story1());auto ys=yori.initial_state();
-    check(yori.state_size()==9*(28+24)+17,"story1 received-material MVLEM state size");
+    check(yori.state_size()==9*(37+24)+17,"story1 received-material MVLEM state size");
     // Pure axial virgin trial at eps=-0.0004. Expected resultant aggregates
     // frozen OpenSees ConcreteCM stresses with the symmetric virgin steel law.
     auto axial=yori.trial({0,0,0,0,-.0288,0},ys.data());

@@ -34,7 +34,7 @@ std::vector<double> concrete_protocol(){
 }
 void verify_concrete_bridge(const ConcreteCMParameters& p){
     ConcreteCM direct(p);auto ds=direct.initial_state();
-    auto wall=WallUniaxial::concrete_cm(p);check(wall.state_size()==28,"ConcreteCM wall state size");near(wall.initial_tangent(),p.Ec,1e-12,"ConcreteCM wall initial tangent");
+    auto wall=WallUniaxial::concrete_cm(p);check(wall.state_size()==37,"ConcreteCM wall state size");near(wall.initial_tangent(),p.Ec,1e-12,"ConcreteCM wall initial tangent");
     std::vector<double> ws(wall.state_size()),wt(wall.state_size());wall.initialize(ws.data());
     const auto protocol=concrete_protocol();check(protocol.size()==241,"ConcreteCM bridge protocol size");
     for(double strain:protocol){
