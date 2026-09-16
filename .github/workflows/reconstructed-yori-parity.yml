@@ -23,6 +23,7 @@ jobs:
           python tools/apply_nested_provenance_patch.py
           python tools/apply_rule10_universal_patch.py
           python tools/apply_concretecm_fallback_diagnostic.py
+          python tools/apply_substep_trace_patch.py
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
         run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
