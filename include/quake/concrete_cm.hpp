@@ -129,14 +129,9 @@ public:
     const ConcreteCMParameters& parameters() const noexcept { return envelope_.parameters(); }
     ConcreteCMState initial_state() const noexcept;
     ConcreteCMTrial trial(double strain, const ConcreteCMState& committed) const;
-    ConcreteCMTrial trial_legacy(double strain, const ConcreteCMState& committed) const;
 
 private:
     ConcreteCMEnvelope envelope_;
 };
 
 } // namespace quake
-
-#ifdef QUAKE_CONCRETE_CM_RENAME_TRIAL
-#define trial trial_legacy
-#endif
