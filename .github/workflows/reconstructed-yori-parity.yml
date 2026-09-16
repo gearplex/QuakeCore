@@ -73,6 +73,14 @@ jobs:
             --job reconstructed_job.json \
             --quake quake_reconstructed.json \
             --out reconstructed_comparison/material_history_diagnostic.json
+      - name: Benchmark common 1000-step exact-law prefix
+        run: |
+          python validation/yori_wall_10001/benchmark_reconstructed_prefix.py \
+            --job reconstructed_job.json \
+            --quake-exe ./build/quake_run \
+            --steps 1000 \
+            --repetitions 7 \
+            --out reconstructed_comparison/runtime_prefix_1000.json
       - name: Compare to independent OpenSeesPy 3.8.0 model
         run: |
           python validation/yori_wall_10001/compare_reconstructed_exact_10001.py \
