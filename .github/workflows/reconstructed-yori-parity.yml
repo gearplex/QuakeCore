@@ -73,7 +73,6 @@ jobs:
             --quake quake_reconstructed.json \
             --out reconstructed_comparison/material_history_diagnostic.json
       - name: Compare common-prefix wall force EDPs
-        continue-on-error: true
         run: |
           python validation/yori_wall_10001/compare_wall_force_edps.py \
             --job reconstructed_job.json \
@@ -88,13 +87,22 @@ jobs:
             --steps 1000 \
             --repetitions 7 \
             --out reconstructed_comparison/runtime_prefix_1000.json
-      - name: Compare to independent OpenSeesPy 3.8.0 model
+      - name: Strict full-trace comparator diagnostic
+        continue-on-error: true
         run: |
           python validation/yori_wall_10001/compare_reconstructed_exact_10001.py \
             --job reconstructed_job.json \
             --quake quake_reconstructed.json \
             --out reconstructed_comparison \
             --assert-parity
+      - name: Assess engineering parity
+        run: |
+          python validation/yori_wall_10001/assess_engineering_parity.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --response-summary reconstructed_comparison/reconstructed_exact_summary.json \
+            --wall-force-summary reconstructed_comparison/wall_force_edp_summary.json \
+            --out reconstructed_comparison/engineering_parity_summary.json
       - name: Upload reconstructed parity evidence
         if: always()
         uses: actions/upload-artifact@v4
