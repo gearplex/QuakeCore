@@ -8,7 +8,7 @@
 namespace quake {
 namespace {
 void positive(double x) { if(!std::isfinite(x)||x<=0)throw std::invalid_argument("wall material modulus/strength must be finite and positive"); }
-constexpr int concrete_cm_state_size=28;
+constexpr int concrete_cm_state_size=37;
 constexpr int pinching4_state_size=17;
 void encode_concrete_cm_state(const ConcreteCMState& s,double* v){
     v[0]=static_cast<int>(s.rule);v[1]=s.strain;v[2]=s.stress;v[3]=s.tangent;v[4]=s.increment;
@@ -19,6 +19,10 @@ void encode_concrete_cm_state(const ConcreteCMState& s,double* v){
     v[20]=s.positive_zero_stress_strain;v[21]=s.positive_zero_stress_tangent;v[22]=s.compression_new_stress;v[23]=s.compression_new_tangent;
     v[24]=s.compression_rejoin_strain;v[25]=s.compression_rejoin_stress;v[26]=s.compression_rejoin_tangent;
     v[27]=s.has_second_negative_to_positive_reversal?1.0:0.0;
+    v[28]=s.nested_positive_origin_strain;v[29]=s.nested_positive_origin_stress;v[30]=s.nested_positive_target_strain;
+    v[31]=s.nested_negative_origin_strain;v[32]=s.nested_negative_origin_stress;v[33]=s.nested_negative_target_strain;
+    v[34]=s.positive_return_reversal_strain;v[35]=s.positive_return_reversal_stress;
+    v[36]=s.nested_negative_target_uses_rule77?1.0:0.0;
 }
 ConcreteCMState decode_concrete_cm_state(const double* v){
     ConcreteCMState s;s.rule=static_cast<ConcreteCMRule>(static_cast<int>(v[0]));s.strain=v[1];s.stress=v[2];s.tangent=v[3];s.increment=v[4];
@@ -28,7 +32,7 @@ ConcreteCMState decode_concrete_cm_state(const double* v){
     s.has_positive_to_negative_reversal=v[17]!=0.0;s.positive_reversal_strain=v[18];s.positive_reversal_stress=v[19];
     s.positive_zero_stress_strain=v[20];s.positive_zero_stress_tangent=v[21];s.compression_new_stress=v[22];s.compression_new_tangent=v[23];
     s.compression_rejoin_strain=v[24];s.compression_rejoin_stress=v[25];s.compression_rejoin_tangent=v[26];
-    s.has_second_negative_to_positive_reversal=v[27]!=0.0;return s;
+    s.has_second_negative_to_positive_reversal=v[27]!=0.0;s.nested_positive_origin_strain=v[28];s.nested_positive_origin_stress=v[29];s.nested_positive_target_strain=v[30];s.nested_negative_origin_strain=v[31];s.nested_negative_origin_stress=v[32];s.nested_negative_target_strain=v[33];s.positive_return_reversal_strain=v[34];s.positive_return_reversal_stress=v[35];s.nested_negative_target_uses_rule77=v[36]!=0.0;return s;
 }
 void encode_pinching4_state(const Pinching4State& s,double* v){
     v[0]=static_cast<int>(s.kind);v[1]=s.deformation;v[2]=s.force;v[3]=s.tangent;v[4]=s.deformation_rate;

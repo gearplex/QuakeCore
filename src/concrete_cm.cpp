@@ -167,7 +167,7 @@ ConcreteCMResponse rule4(const ConcreteCMParameters& p,
 }
 
 ConcreteCMResponse rule10(const ConcreteCMState& state, double strain) {
-    return smooth_transition(
+    auto response = smooth_transition(
         strain,
         state.positive_zero_stress_strain,
         0.0,
@@ -175,6 +175,24 @@ ConcreteCMResponse rule10(const ConcreteCMState& state, double strain) {
         state.unloading_strain,
         state.compression_new_stress,
         state.compression_new_tangent);
+
+    // OpenSees 3.8.0 ConcreteCM "Fix 2": when fcEturf collapses onto
+    // the endpoint secant for rule 10, replace that degenerate branch by
+    // either the zero-stress gap or the negative-side Enewn line through
+    // espln. This is an explicit post-processing step in ConcreteCM.cpp.
+    const double endpoint_secant =
+        state.compression_new_stress /
+        (state.unloading_strain - state.positive_zero_stress_strain);
+    if (response.tangent == endpoint_secant) {
+        if (strain >= state.zero_stress_strain) {
+            return {0.0, 0.0};
+        }
+        return {
+            state.compression_new_tangent * (strain - state.zero_stress_strain),
+            state.compression_new_tangent,
+        };
+    }
+    return response;
 }
 
 ConcreteCMResponse rule7(const ConcreteCMState& state, double strain) {
@@ -253,9 +271,16 @@ ConcreteCMState second_reversal_state(const ConcreteCMEnvelope& envelope_kernel,
     const auto& p = envelope_kernel.parameters();
     ConcreteCMState reversal = committed;
     reversal.has_positive_to_negative_reversal = true;
-    reversal.positive_reversal_strain = committed.strain;
-    reversal.positive_reversal_stress = envelope_kernel.tension(
+
+    // OpenSees 3.8.0 Crule 2/8 negative reversal promotes Cstrain/Cstress
+    // to the primary positive history point Teunp/Tfunp.  The earlier Gate-4
+    // implementation only saved this point in positive_reversal_* and left
+    // tension_peak_* stale, which later corrupts ea1112f on Crule 10 -> 12.
+    reversal.tension_peak_strain = committed.strain;
+    reversal.tension_peak_stress = envelope_kernel.tension(
         committed.strain, committed.tension_zero_strain).stress;
+    reversal.positive_reversal_strain = reversal.tension_peak_strain;
+    reversal.positive_reversal_stress = reversal.tension_peak_stress;
 
     const double Esecp = tension_secant(
         p,
@@ -269,6 +294,10 @@ ConcreteCMState second_reversal_state(const ConcreteCMEnvelope& envelope_kernel,
         ? p.Ec / (std::pow(std::abs(
               (reversal.positive_reversal_strain - committed.tension_zero_strain) / p.et), 1.1) + 1.0)
         : 0.0;
+
+    // OpenSees reconstructs fnewp/Enewp/esrep/frep from the newly committed
+    // Teunp/Tfunp at the start of every subsequent cyclic trial.
+    populate_positive_rejoin_landmarks(envelope_kernel, reversal);
 
     const double delfn = committed.unloading_strain <= p.epsc / 10.0
         ? 0.09 * committed.unloading_stress *
@@ -305,20 +334,26 @@ ConcreteCMState second_negative_to_positive_reversal_state(
     reversal.zero_stress_strain = compression.zero_stress_strain;
     reversal.zero_stress_tangent = compression.zero_stress_tangent;
 
+    // OpenSees e0eunpfunpf is cycle-count agnostic. It compares the new
+    // compression extreme xun with the current primary Teunp/Tfunp history,
+    // not with an auxiliary earlier reversal point. If compression dominates,
+    // it resets the tensile reference to the virgin envelope at xup=xun.
     const double xun = std::abs(reversal.unloading_strain / p.epsc);
-    const double xup = std::abs(
-        (committed.positive_reversal_strain - committed.tension_zero_strain) / p.et);
+    double xup = std::abs(
+        (committed.tension_peak_strain - committed.tension_zero_strain) / p.et);
+    double e0ref = committed.tension_zero_strain;
+    double eunpref = committed.tension_peak_strain;
+    double funpref = committed.tension_peak_stress;
     if (xup < xun) {
-        throw std::logic_error(
-            "ConcreteCM second rebound compression-dominant branch is not yet admitted in Gate 4");
+        xup = xun;
+        e0ref = 0.0;
+        eunpref = xup * p.et;
+        funpref = envelope_kernel.tension(eunpref, e0ref).stress;
     }
 
-    const double reference_peak_strain = committed.positive_reversal_strain;
-    const double reference_peak_stress = committed.positive_reversal_stress;
     const double reference_secant = tension_secant(
-        p, committed.tension_zero_strain, reference_peak_strain,
-        reference_peak_stress, reversal.zero_stress_strain);
-    const double dele0 = 2.0 * reference_peak_stress /
+        p, e0ref, eunpref, funpref, reversal.zero_stress_strain);
+    const double dele0 = 2.0 * funpref /
                          (reference_secant + reversal.zero_stress_tangent);
 
     reversal.tension_zero_strain =
@@ -379,6 +414,78 @@ ConcreteCMTrial make_trial(const ConcreteCMState& base,
     next.increment = increment;
     next.rule = rule;
     return {response, next};
+}
+
+struct PositiveReturnLandmarks {
+    double shortened_peak_stress{};
+    double shortened_peak_tangent{};
+    double shortened_rejoin_strain{};
+    double shortened_rejoin_stress{};
+    double shortened_rejoin_tangent{};
+};
+
+PositiveReturnLandmarks positive_return_landmarks(
+    const ConcreteCMEnvelope& envelope_kernel,
+    const ConcreteCMState& state) {
+    const auto& p = envelope_kernel.parameters();
+    const double Esecp = tension_secant(
+        p, state.tension_zero_strain, state.tension_peak_strain,
+        state.tension_peak_stress, state.zero_stress_strain);
+    const double esplp = state.tension_peak_strain - state.tension_peak_stress / Esecp;
+    const double delfp =
+        state.tension_peak_strain >= state.tension_zero_strain + p.et / 2.0
+            ? 0.15 * state.tension_peak_stress
+            : 0.0;
+    const double ratio =
+        (state.tension_peak_strain - state.positive_return_reversal_strain) /
+        (state.tension_peak_strain - esplp);
+    const double fnewstp = state.tension_peak_stress - delfp * ratio;
+    const double Enewstp =
+        (fnewstp - state.positive_return_reversal_stress) /
+        (state.tension_peak_strain - state.positive_return_reversal_strain);
+    const double delep = 0.22 * std::abs(
+        state.tension_peak_strain - state.tension_zero_strain);
+    const double esrestp = state.tension_peak_strain + delep * ratio;
+    const auto rest = envelope_kernel.tension(esrestp, state.tension_zero_strain);
+    return {fnewstp, Enewstp, esrestp, rest.stress, rest.tangent};
+}
+
+ConcreteCMTrial rule88_trial(const ConcreteCMEnvelope& envelope_kernel,
+                             const ConcreteCMState& base,
+                             double strain) {
+    const auto& p = envelope_kernel.parameters();
+    const auto lm = positive_return_landmarks(envelope_kernel, base);
+    if (strain <= base.tension_peak_strain) {
+        return make_trial(
+            base, strain,
+            smooth_transition(
+                strain,
+                base.positive_return_reversal_strain,
+                base.positive_return_reversal_stress,
+                p.Ec,
+                base.tension_peak_strain,
+                lm.shortened_peak_stress,
+                lm.shortened_peak_tangent),
+            1.0, ConcreteCMRule::TensionReversalTransition);
+    }
+    if (strain < lm.shortened_rejoin_strain) {
+        return make_trial(
+            base, strain,
+            smooth_transition(
+                strain,
+                base.tension_peak_strain,
+                lm.shortened_peak_stress,
+                lm.shortened_peak_tangent,
+                lm.shortened_rejoin_strain,
+                lm.shortened_rejoin_stress,
+                lm.shortened_rejoin_tangent),
+            1.0, ConcreteCMRule::TensionReversalTransition);
+    }
+    const auto response = envelope_kernel.tension(strain, base.tension_zero_strain);
+    const auto rule = (response.stress == 0.0 && response.tangent == 0.0)
+        ? ConcreteCMRule::TensionCutoff
+        : ConcreteCMRule::TensionEnvelope;
+    return make_trial(base, strain, response, 1.0, rule);
 }
 
 ConcreteCMTrial positive_path_trial(const ConcreteCMEnvelope& envelope_kernel,
@@ -523,11 +630,8 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
             throw std::logic_error(
                 "ConcreteCM negative-to-positive reversal requires a committed compression point");
         }
-        if (committed.has_second_negative_to_positive_reversal) {
-            throw std::logic_error(
-                "ConcreteCM deeper nested reversal is not yet admitted in Gate 4");
-        }
-        if (committed.has_positive_to_negative_reversal) {
+        if (committed.has_positive_to_negative_reversal ||
+            committed.has_second_negative_to_positive_reversal) {
             const auto reversal = second_negative_to_positive_reversal_state(
                 envelope_, committed);
             return positive_path_trial(envelope_, reversal, strain);
@@ -539,13 +643,416 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
     if (committed.rule == ConcreteCMRule::CompressionReversalTransition) {
         if (strain > committed.strain) {
             if (committed.strain < committed.unloading_strain) {
-                throw std::logic_error(
-                    "ConcreteCM rule77 positive reversal: Cstrain < Teunn");
+                const auto& p = parameters();
+                ConcreteCMState reversal = committed;
+                reversal.unloading_strain = committed.strain;
+                reversal.unloading_stress = committed.stress;
+
+                const auto compression = compression_unloading_landmarks(
+                    p, reversal.unloading_strain, reversal.unloading_stress);
+                reversal.zero_stress_strain = compression.zero_stress_strain;
+                reversal.zero_stress_tangent = compression.zero_stress_tangent;
+
+                const double xun = std::abs(reversal.unloading_strain / p.epsc);
+                double xup = std::abs(
+                    (committed.tension_peak_strain - committed.tension_zero_strain) / p.et);
+                double e0ref = committed.tension_zero_strain;
+                double eunpref = committed.tension_peak_strain;
+                double funpref = committed.tension_peak_stress;
+                if (xup < xun) {
+                    xup = xun;
+                    e0ref = 0.0;
+                    eunpref = xup * p.et;
+                    funpref = envelope_.tension(eunpref, e0ref).stress;
+                }
+
+                const double Esecp = tension_secant(
+                    p, e0ref, eunpref, funpref, reversal.zero_stress_strain);
+                const double dele0 = 2.0 * funpref /
+                                     (Esecp + reversal.zero_stress_tangent);
+                reversal.tension_zero_strain =
+                    reversal.zero_stress_strain + dele0 - xup * p.et;
+                reversal.tension_peak_strain =
+                    xup * p.et + reversal.tension_zero_strain;
+                reversal.tension_peak_stress = envelope_.tension(
+                    reversal.tension_peak_strain, reversal.tension_zero_strain).stress;
+                populate_positive_rejoin_landmarks(envelope_, reversal);
+                return positive_path_trial(envelope_, reversal, strain);
             }
-            throw std::logic_error(
-                "ConcreteCM rule77 positive reversal: Cstrain >= Teunn");
+
+            // OpenSees 3.8.0 Crule=77, Cstrain>=Teunn. Tea is the original
+            // rule-77 reversal strain (Ter0n), while Teb is this reversal
+            // point. Rule 12 transitions from Ter/Tfr to Tea with Ec as the
+            // initial tangent; Tea and Teb remain fixed across nested cycles.
+            ConcreteCMState reversal = committed;
+            reversal.nested_positive_origin_strain = committed.strain;
+            reversal.nested_positive_origin_stress = committed.stress;
+            reversal.nested_positive_target_strain = committed.positive_reversal_strain; // Tea=Ter0n
+            reversal.nested_negative_target_strain = committed.strain; // Teb (rule77)
+            reversal.nested_negative_target_uses_rule77 = true;
+            const auto target = positive_path_trial(
+                envelope_, committed, reversal.nested_positive_target_strain);
+            if (strain <= reversal.nested_positive_target_strain) {
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    target.response.stress,
+                    target.response.tangent);
+                return make_trial(reversal, strain, response, 1.0,
+                                  ConcreteCMRule::NestedPositiveTarget);
+            }
+            return positive_path_trial(envelope_, reversal, strain);
         }
         return rule77_trial(envelope_, committed, strain);
+    }
+
+    if (committed.rule == ConcreteCMRule::NestedPositiveTarget) {
+        const auto positive_target = positive_path_trial(
+            envelope_, committed, committed.nested_positive_target_strain);
+        if (strain < committed.strain) {
+            // OpenSees 3.8.0 Crule=12 reversal for the rule77->12 provenance:
+            // Tea == Ter0n and Teb is the saved rule-77 reversal point. The
+            // negative reversal creates rule 11 from current Ter/Tfr to Teb.
+            ConcreteCMState reversal = committed;
+            reversal.nested_negative_origin_strain = committed.strain;
+            reversal.nested_negative_origin_stress = committed.stress;
+            const double target_strain = committed.nested_negative_target_strain; // Teb
+            const bool from_rule77 =
+                committed.nested_negative_target_uses_rule77;
+            const auto target = from_rule77
+                ? rule77_trial(envelope_, committed, target_strain)
+                : first_negative_return_trial(envelope_, committed, target_strain);
+            if (strain >= target_strain) {
+                const auto normalized_target = smooth_transition(
+                    target_strain,
+                    reversal.nested_negative_origin_strain,
+                    reversal.nested_negative_origin_stress,
+                    parameters().Ec,
+                    target_strain,
+                    target.response.stress,
+                    target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_negative_origin_strain,
+                    reversal.nested_negative_origin_stress,
+                    parameters().Ec,
+                    target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
+                return make_trial(reversal, strain, response, -1.0,
+                                  ConcreteCMRule::NestedNegativeTarget);
+            }
+            return from_rule77
+                ? rule77_trial(envelope_, reversal, strain)
+                : first_negative_return_trial(envelope_, reversal, strain);
+        }
+        if (strain <= committed.nested_positive_target_strain) {
+            const auto response = smooth_transition(
+                strain,
+                committed.nested_positive_origin_strain,
+                committed.nested_positive_origin_stress,
+                parameters().Ec,
+                committed.nested_positive_target_strain,
+                positive_target.response.stress,
+                positive_target.response.tangent);
+            return make_trial(committed, strain, response, 1.0,
+                              ConcreteCMRule::NestedPositiveTarget);
+        }
+        return positive_path_trial(envelope_, committed, strain);
+    }
+
+    if (committed.rule == ConcreteCMRule::NestedNegativeTarget) {
+        const double target_strain = committed.nested_negative_target_strain; // Teb
+        const bool from_rule77 =
+            committed.nested_negative_target_uses_rule77;
+        const auto negative_target = from_rule77
+            ? rule77_trial(envelope_, committed, target_strain)
+            : first_negative_return_trial(envelope_, committed, target_strain);
+        if (strain > committed.strain) {
+            // OpenSees 3.8.0 Crule=11 positive reversal for this provenance:
+            // keep Tea/Teb fixed, move Ter/Tfr to the current point, and
+            // create rule 12 targeting Tea on the established positive path.
+            ConcreteCMState reversal = committed;
+            reversal.nested_positive_origin_strain = committed.strain;
+            reversal.nested_positive_origin_stress = committed.stress;
+            const auto positive_target = positive_path_trial(
+                envelope_, committed, committed.nested_positive_target_strain);
+            if (strain <= committed.nested_positive_target_strain) {
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    committed.nested_positive_target_strain,
+                    positive_target.response.stress,
+                    positive_target.response.tangent);
+                return make_trial(reversal, strain, response, 1.0,
+                                  ConcreteCMRule::NestedPositiveTarget);
+            }
+            return positive_path_trial(envelope_, reversal, strain);
+        }
+        if (strain >= target_strain) {
+            const auto response = smooth_transition(
+                strain,
+                committed.nested_negative_origin_strain,
+                committed.nested_negative_origin_stress,
+                parameters().Ec,
+                target_strain,
+                negative_target.response.stress,
+                negative_target.response.tangent);
+            return make_trial(committed, strain, response, -1.0,
+                              ConcreteCMRule::NestedNegativeTarget);
+        }
+        return from_rule77
+            ? rule77_trial(envelope_, committed, strain)
+            : first_negative_return_trial(envelope_, committed, strain);
+    }
+
+    if (committed.rule == ConcreteCMRule::CompressionToTension) {
+        if (strain < committed.strain) {
+            // OpenSees 3.8.0 Crule=9 negative reversal. This branch is driven
+            // by Crule, not by QuakeCore's cycle-history flags. Reconstruct
+            // the derived esplp/Eplp and negative-return landmarks from the
+            // primary Teunp/Tfunp and Teunn/Tfunn history exactly as OpenSees
+            // does at the start of each cyclic trial, then apply eb1112f.
+            const auto& p = parameters();
+            ConcreteCMState negative_base = committed;
+
+            const double Esecp = tension_secant(
+                p,
+                committed.tension_zero_strain,
+                committed.tension_peak_strain,
+                committed.tension_peak_stress,
+                committed.zero_stress_strain);
+            const double esplp =
+                committed.tension_peak_strain - committed.tension_peak_stress / Esecp;
+            const double Eplp = p.gap_close
+                ? p.Ec / (std::pow(std::abs(
+                      (committed.tension_peak_strain - committed.tension_zero_strain) /
+                      p.et), 1.1) + 1.0)
+                : 0.0;
+            negative_base.positive_reversal_strain = committed.tension_peak_strain;
+            negative_base.positive_reversal_stress = committed.tension_peak_stress;
+            negative_base.positive_zero_stress_strain = esplp;
+            negative_base.positive_zero_stress_tangent = Eplp;
+
+            const double delfn = committed.unloading_strain <= p.epsc / 10.0
+                ? 0.09 * committed.unloading_stress *
+                      std::pow(std::abs(committed.unloading_strain / p.epsc), 0.5)
+                : 0.0;
+            negative_base.compression_new_stress = committed.unloading_stress - delfn;
+            negative_base.compression_new_tangent =
+                committed.unloading_strain == committed.zero_stress_strain
+                    ? p.Ec
+                    : std::min(
+                          p.Ec,
+                          negative_base.compression_new_stress /
+                              (committed.unloading_strain - committed.zero_stress_strain));
+            const double delen = committed.unloading_strain /
+                (1.15 + 2.75 * std::abs(committed.unloading_strain / p.epsc));
+            negative_base.compression_rejoin_strain = committed.unloading_strain + delen;
+            const auto compression_rejoin = envelope_.compression(
+                negative_base.compression_rejoin_strain);
+            negative_base.compression_rejoin_stress = compression_rejoin.stress;
+            negative_base.compression_rejoin_tangent = compression_rejoin.tangent;
+
+            ConcreteCMState reversal = negative_base;
+            reversal.nested_negative_origin_strain = committed.strain; // Ter
+            reversal.nested_negative_origin_stress = committed.stress; // Tfr
+            reversal.nested_positive_target_strain = committed.strain; // Tea
+            const double denom =
+                committed.tension_peak_strain - committed.zero_stress_strain;
+            reversal.nested_negative_target_strain =
+                committed.unloading_strain -
+                ((committed.strain - committed.zero_stress_strain) / denom) *
+                    (committed.unloading_strain - esplp); // Teb = eb1112f(...)
+            reversal.nested_negative_target_uses_rule77 = false;
+
+            const double target_strain = reversal.nested_negative_target_strain;
+            const auto target = first_negative_return_trial(
+                envelope_, negative_base, target_strain);
+            if (strain >= target_strain) {
+                // OpenSees r11f normalizes the endpoint at Teb before the
+                // caller evaluates the actual trial strain.
+                const auto normalized_target = smooth_transition(
+                    target_strain,
+                    reversal.nested_negative_origin_strain,
+                    reversal.nested_negative_origin_stress,
+                    p.Ec,
+                    target_strain,
+                    target.response.stress,
+                    target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_negative_origin_strain,
+                    reversal.nested_negative_origin_stress,
+                    p.Ec,
+                    target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
+                return make_trial(reversal, strain, response, -1.0,
+                                  ConcreteCMRule::NestedNegativeTarget);
+            }
+            return first_negative_return_trial(envelope_, reversal, strain);
+        }
+        return positive_path_trial(envelope_, committed, strain);
+    }
+
+    if (committed.rule == ConcreteCMRule::TensionReversalTransition) {
+        if (strain < committed.strain) {
+            // OpenSees 3.8.0 Crule=88 negative reversal.
+            // If the committed point is still at/below Teunp, preserve the
+            // rule-4 reversal point as Teb=Ter0p and create rule 11 from the
+            // current Ter/Tfr back to that point.  Ter0p was created while
+            // rule 4 was active, so this demanded provenance has Teb>=esplp.
+            if (committed.strain <= committed.tension_peak_strain) {
+                ConcreteCMState reversal = committed;
+                reversal.nested_negative_origin_strain = committed.strain; // Ter
+                reversal.nested_negative_origin_stress = committed.stress; // Tfr
+                reversal.nested_positive_target_strain = committed.strain; // Tea=Ter
+                reversal.nested_negative_target_strain =
+                    committed.positive_return_reversal_strain; // Teb=Ter0p
+                reversal.nested_negative_target_uses_rule77 = false;
+
+                const double target_strain = reversal.nested_negative_target_strain;
+                const auto target = first_negative_return_trial(
+                    envelope_, committed, target_strain); // rule 4 at Teb
+                if (strain >= target_strain) {
+                    // OpenSees r11f evaluates the raw target once at Teb,
+                    // promotes that evaluated stress/tangent to ff/Ef, then
+                    // the caller evaluates the actual trial point.
+                    const auto normalized_target = smooth_transition(
+                        target_strain,
+                        reversal.nested_negative_origin_strain,
+                        reversal.nested_negative_origin_stress,
+                        parameters().Ec,
+                        target_strain,
+                        target.response.stress,
+                        target.response.tangent);
+                    const auto response = smooth_transition(
+                        strain,
+                        reversal.nested_negative_origin_strain,
+                        reversal.nested_negative_origin_stress,
+                        parameters().Ec,
+                        target_strain,
+                        normalized_target.stress,
+                        normalized_target.tangent);
+                    return make_trial(reversal, strain, response, -1.0,
+                                      ConcreteCMRule::NestedNegativeTarget);
+                }
+                return first_negative_return_trial(envelope_, reversal, strain);
+            }
+
+            // OpenSees Crule=88 with Cstrain>Teunp promotes the current point
+            // to the new Teunp/Tfunp, rebuilds esplp/Eplp, and then follows
+            // rules 4,10,7,1/5.  second_reversal_state is the QuakeCore
+            // representation of that primary-history refresh.
+            const auto reversal = second_reversal_state(envelope_, committed);
+            return first_negative_return_trial(envelope_, reversal, strain);
+        }
+        return rule88_trial(envelope_, committed, strain);
+    }
+
+    if (committed.rule == ConcreteCMRule::CompressionRejoining) {
+        if (strain > committed.strain) {
+            const auto reversal = second_negative_to_positive_reversal_state(
+                envelope_, committed);
+            return positive_path_trial(envelope_, reversal, strain);
+        }
+        return first_negative_return_trial(envelope_, committed, strain);
+    }
+
+    if (committed.rule == ConcreteCMRule::TensionToCompression) {
+        // OpenSees 3.8.0 dispatches Crule=10 by rule identity, independent of
+        // how the material arrived there. Reconstruct the derived cyclic
+        // landmarks from the primary Teunp/Tfunp and Teunn/Tfunn history
+        // before either continuing negative or reversing positive.
+        const auto& p = parameters();
+        ConcreteCMState refreshed = committed;
+
+        const double Esecp = tension_secant(
+            p,
+            committed.tension_zero_strain,
+            committed.tension_peak_strain,
+            committed.tension_peak_stress,
+            committed.zero_stress_strain);
+        const double esplp =
+            committed.tension_peak_strain - committed.tension_peak_stress / Esecp;
+        const double Eplp = p.gap_close
+            ? p.Ec / (std::pow(std::abs(
+                  (committed.tension_peak_strain - committed.tension_zero_strain) /
+                  p.et), 1.1) + 1.0)
+            : 0.0;
+        refreshed.positive_zero_stress_strain = esplp;
+        refreshed.positive_zero_stress_tangent = Eplp;
+        refreshed.positive_reversal_strain = committed.tension_peak_strain;
+        refreshed.positive_reversal_stress = committed.tension_peak_stress;
+
+        const double delfn = committed.unloading_strain <= p.epsc / 10.0
+            ? 0.09 * committed.unloading_stress *
+                  std::pow(std::abs(committed.unloading_strain / p.epsc), 0.5)
+            : 0.0;
+        refreshed.compression_new_stress = committed.unloading_stress - delfn;
+        refreshed.compression_new_tangent =
+            committed.unloading_strain == committed.zero_stress_strain
+                ? p.Ec
+                : std::min(
+                      p.Ec,
+                      refreshed.compression_new_stress /
+                          (committed.unloading_strain - committed.zero_stress_strain));
+        const double delen = committed.unloading_strain /
+            (1.15 + 2.75 * std::abs(committed.unloading_strain / p.epsc));
+        refreshed.compression_rejoin_strain = committed.unloading_strain + delen;
+        const auto compression_rejoin = envelope_.compression(
+            refreshed.compression_rejoin_strain);
+        refreshed.compression_rejoin_stress = compression_rejoin.stress;
+        refreshed.compression_rejoin_tangent = compression_rejoin.tangent;
+        populate_positive_rejoin_landmarks(envelope_, refreshed);
+
+        if (strain > committed.strain) {
+            // OpenSees Crule=10 positive reversal: Teb=current, Tea=ea1112f.
+            ConcreteCMState reversal = refreshed;
+            reversal.nested_positive_origin_strain = committed.strain; // Teb/Ter
+            reversal.nested_positive_origin_stress = committed.stress;
+            reversal.nested_negative_target_strain = committed.strain; // Teb
+            reversal.nested_negative_target_uses_rule77 = false;
+            const double denom = committed.unloading_strain - esplp;
+            reversal.nested_positive_target_strain =
+                committed.zero_stress_strain +
+                ((committed.unloading_strain - committed.strain) / denom) *
+                    (committed.tension_peak_strain - committed.zero_stress_strain); // Tea
+
+            const auto target = positive_path_trial(
+                envelope_, refreshed, reversal.nested_positive_target_strain);
+            if (strain <= reversal.nested_positive_target_strain) {
+                // r12f first normalizes its endpoint at Tea, then the caller
+                // evaluates the actual trial strain with a second RAf/fcEturf.
+                const auto normalized_target = smooth_transition(
+                    reversal.nested_positive_target_strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    p.Ec,
+                    reversal.nested_positive_target_strain,
+                    target.response.stress,
+                    target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    p.Ec,
+                    reversal.nested_positive_target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
+                return make_trial(reversal, strain, response, 1.0,
+                                  ConcreteCMRule::NestedPositiveTarget);
+            }
+            return positive_path_trial(envelope_, reversal, strain);
+        }
+
+        return first_negative_return_trial(envelope_, refreshed, strain);
     }
 
     const bool first_rebound = committed.unloading_strain < 0.0;
@@ -574,12 +1081,141 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
 
     if (committed.has_positive_to_negative_reversal &&
         !committed.has_second_negative_to_positive_reversal &&
+        (committed.rule == ConcreteCMRule::TensionEnvelope ||
+         committed.rule == ConcreteCMRule::TensionRejoining)) {
+        if (strain < committed.strain) {
+            const auto reversal = second_reversal_state(envelope_, committed);
+            return first_negative_return_trial(envelope_, reversal, strain);
+        }
+        return positive_path_trial(envelope_, committed, strain);
+    }
+
+    // OpenSees dispatch remains rule-driven after later rebounds.  A committed
+    // rule 4 still continues on the ordinary negative-return path; if it
+    // reverses positive, it creates a fresh Ter0p/Tfr0p and rule 88 exactly as
+    // it does on the first cycle.
+    if (committed.has_positive_to_negative_reversal &&
+        committed.has_second_negative_to_positive_reversal &&
+        committed.rule == ConcreteCMRule::TensionUnloading) {
+        if (strain > committed.strain) {
+            ConcreteCMState reversal = committed;
+            reversal.positive_return_reversal_strain = committed.strain;
+            reversal.positive_return_reversal_stress = committed.stress;
+            reversal.nested_negative_target_strain = committed.strain;
+            return rule88_trial(envelope_, reversal, strain);
+        }
+        return first_negative_return_trial(envelope_, committed, strain);
+    }
+
+    if (committed.has_positive_to_negative_reversal &&
+        !committed.has_second_negative_to_positive_reversal &&
         (committed.rule == ConcreteCMRule::TensionUnloading ||
          committed.rule == ConcreteCMRule::TensionToCompression ||
          committed.rule == ConcreteCMRule::CompressionRejoining)) {
         if (strain > committed.strain) {
-            throw std::logic_error(
-                "ConcreteCM reversal from the first negative return is not yet admitted in Gate 4");
+            // OpenSees 3.8.0: a reversal from rule 7 follows the same
+            // negative-to-positive refresh used by rules 1/5: update eunn/funn,
+            // rebuild the shifted positive path with e0eunpfunpf, then select
+            // rules 3/9/8/2/6 at the requested strain. QuakeCore's existing
+            // second-negative-to-positive helper is the direct mapping.
+            if (committed.rule == ConcreteCMRule::CompressionRejoining) {
+                if (committed.has_second_negative_to_positive_reversal) {
+                    throw std::logic_error(
+                        "ConcreteCM deeper nested reversal is not yet admitted in Gate 4");
+                }
+                const auto reversal = second_negative_to_positive_reversal_state(
+                    envelope_, committed);
+                return positive_path_trial(envelope_, reversal, strain);
+            }
+            if (committed.rule == ConcreteCMRule::TensionUnloading) {
+                ConcreteCMState reversal = committed;
+                reversal.positive_return_reversal_strain = committed.strain; // Ter0p
+                reversal.positive_return_reversal_stress = committed.stress; // Tfr0p
+                reversal.nested_negative_target_strain = committed.strain; // Teb=Ter0p
+                return rule88_trial(envelope_, reversal, strain);
+            }
+
+            // OpenSees 3.8.0 Crule=10 positive reversal. Save Teb at the
+            // current point, derive Tea with ea1112f, and create rule 12 from
+            // Ter/Tfr to the established positive path at Tea.
+            ConcreteCMState reversal = committed;
+            reversal.nested_positive_origin_strain = committed.strain; // Teb
+            reversal.nested_positive_origin_stress = committed.stress;
+            reversal.nested_negative_target_strain = committed.strain; // Teb
+            reversal.nested_negative_target_uses_rule77 = false;
+            const double denom =
+                committed.unloading_strain - committed.positive_zero_stress_strain;
+            reversal.nested_positive_target_strain =
+                committed.zero_stress_strain +
+                ((committed.unloading_strain - committed.strain) / denom) *
+                    (committed.tension_peak_strain - committed.zero_stress_strain); // Tea
+            const auto target = positive_path_trial(
+                envelope_, committed, reversal.nested_positive_target_strain);
+            if (strain <= reversal.nested_positive_target_strain) {
+                // OpenSees r12f first evaluates the raw transition at Tea and
+                // replaces ff/Ef with that evaluated endpoint. The caller then
+                // runs RAf again before evaluating the actual trial strain.
+                const auto normalized_target = smooth_transition(
+                    reversal.nested_positive_target_strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    target.response.stress,
+                    target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
+                return make_trial(reversal, strain, response, 1.0,
+                                  ConcreteCMRule::NestedPositiveTarget);
+            }
+            return positive_path_trial(envelope_, reversal, strain);
+        }
+        return first_negative_return_trial(envelope_, committed, strain);
+    }
+
+    if (committed.has_second_negative_to_positive_reversal &&
+        committed.rule == ConcreteCMRule::TensionToCompression) {
+        if (strain > committed.strain) {
+            ConcreteCMState reversal = committed;
+            reversal.nested_positive_origin_strain = committed.strain; // Teb
+            reversal.nested_positive_origin_stress = committed.stress;
+            reversal.nested_negative_target_strain = committed.strain; // Teb
+            reversal.nested_negative_target_uses_rule77 = false;
+            const double denom =
+                committed.unloading_strain - committed.positive_zero_stress_strain;
+            reversal.nested_positive_target_strain =
+                committed.zero_stress_strain +
+                ((committed.unloading_strain - committed.strain) / denom) *
+                    (committed.tension_peak_strain - committed.zero_stress_strain); // Tea
+            const auto target = positive_path_trial(
+                envelope_, committed, reversal.nested_positive_target_strain);
+            if (strain <= reversal.nested_positive_target_strain) {
+                const auto normalized_target = smooth_transition(
+                    reversal.nested_positive_target_strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    target.response.stress,
+                    target.response.tangent);
+                const auto response = smooth_transition(
+                    strain,
+                    reversal.nested_positive_origin_strain,
+                    reversal.nested_positive_origin_stress,
+                    parameters().Ec,
+                    reversal.nested_positive_target_strain,
+                    normalized_target.stress,
+                    normalized_target.tangent);
+                return make_trial(reversal, strain, response, 1.0,
+                                  ConcreteCMRule::NestedPositiveTarget);
+            }
+            return positive_path_trial(envelope_, reversal, strain);
         }
         return first_negative_return_trial(envelope_, committed, strain);
     }
@@ -591,8 +1227,23 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
          committed.rule == ConcreteCMRule::TensionEnvelope ||
          committed.rule == ConcreteCMRule::TensionCutoff)) {
         if (strain < committed.strain) {
-            throw std::logic_error(
-                "ConcreteCM reversal from the second rebound is not yet admitted in Gate 4");
+            // OpenSees 3.8.0 negative reversals after the second rebound are
+            // governed by the committed rule, not by a separate history law.
+            if (committed.rule == ConcreteCMRule::CompressionUnloading) {
+                const auto reversal = rule77_reversal_state(envelope_, committed);
+                return rule77_trial(envelope_, reversal, strain);
+            }
+            if (committed.rule == ConcreteCMRule::CompressionToTension) {
+                throw std::logic_error("ConcreteCM second rebound negative reversal from rule9");
+            }
+            if (committed.rule == ConcreteCMRule::TensionRejoining ||
+                committed.rule == ConcreteCMRule::TensionEnvelope) {
+                // OpenSees Crule 2/8 always promotes the current point to
+                // Teunp/Tfunp and restarts the ordinary 4->10->7->1/5 return.
+                const auto reversal = second_reversal_state(envelope_, committed);
+                return first_negative_return_trial(envelope_, reversal, strain);
+            }
+            throw std::logic_error("ConcreteCM second rebound negative reversal from rule6");
         }
         return positive_path_trial(envelope_, committed, strain);
     }
@@ -600,8 +1251,17 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
     if (committed.rule == ConcreteCMRule::TensionEnvelope ||
         committed.rule == ConcreteCMRule::TensionCutoff) {
         if (strain < committed.strain) {
+            if (committed.rule == ConcreteCMRule::TensionEnvelope) {
+                // OpenSees 3.8.0 Crule=2 reversal: save the current positive
+                // extreme as Teunp/Tfunp, construct the positive unloading
+                // landmarks, then follow rules 4, 10, 7, and the compression
+                // envelope. second_reversal_state + first_negative_return_trial
+                // is QuakeCore's direct representation of that sequence.
+                const auto reversal = second_reversal_state(envelope_, committed);
+                return first_negative_return_trial(envelope_, reversal, strain);
+            }
             throw std::logic_error(
-                "ConcreteCM virgin tension reversal rules are not yet admitted in Gate 4");
+                "ConcreteCM virgin tension reversal from rule6");
         }
         const auto response = envelope_.tension(strain, committed.tension_zero_strain);
         const auto rule = (response.stress == 0.0 && response.tangent == 0.0)
@@ -610,7 +1270,94 @@ ConcreteCMTrial ConcreteCM::trial(double strain, const ConcreteCMState& committe
         return make_trial(committed, strain, response, 1.0, rule);
     }
 
-    throw std::logic_error("ConcreteCM committed rule is not implemented in Gate 4");
+    if (committed.rule == ConcreteCMRule::Initial) {
+        throw std::logic_error("ConcreteCM fallback rule0 initial");
+    }
+    if (committed.rule == ConcreteCMRule::CompressionEnvelope) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule1 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule1 p2n history"
+                : "ConcreteCM fallback rule1"));
+    }
+    if (committed.rule == ConcreteCMRule::TensionEnvelope) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule2 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule2 p2n history"
+                : "ConcreteCM fallback rule2"));
+    }
+    if (committed.rule == ConcreteCMRule::CompressionUnloading) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule3 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule3 p2n history"
+                : "ConcreteCM fallback rule3"));
+    }
+    if (committed.rule == ConcreteCMRule::TensionUnloading) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule4 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule4 p2n history"
+                : "ConcreteCM fallback rule4"));
+    }
+    if (committed.rule == ConcreteCMRule::TensionCutoff) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule6 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule6 p2n history"
+                : "ConcreteCM fallback rule6"));
+    }
+    if (committed.rule == ConcreteCMRule::CompressionRejoining) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule7 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule7 p2n history"
+                : "ConcreteCM fallback rule7"));
+    }
+    if (committed.rule == ConcreteCMRule::TensionRejoining) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule8 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule8 p2n history"
+                : "ConcreteCM fallback rule8"));
+    }
+    if (committed.rule == ConcreteCMRule::CompressionToTension) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule9 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule9 p2n history"
+                : "ConcreteCM fallback rule9"));
+    }
+    if (committed.rule == ConcreteCMRule::TensionToCompression) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule10 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule10 p2n history"
+                : "ConcreteCM fallback rule10"));
+    }
+    if (committed.rule == ConcreteCMRule::NestedNegativeTarget) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule11 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule11 p2n history"
+                : "ConcreteCM fallback rule11"));
+    }
+    if (committed.rule == ConcreteCMRule::NestedPositiveTarget) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule12 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule12 p2n history"
+                : "ConcreteCM fallback rule12"));
+    }
+    if (committed.rule == ConcreteCMRule::CompressionReversalTransition) {
+        throw std::logic_error(committed.has_second_negative_to_positive_reversal
+            ? "ConcreteCM fallback rule77 second-rebound history"
+            : (committed.has_positive_to_negative_reversal
+                ? "ConcreteCM fallback rule77 p2n history"
+                : "ConcreteCM fallback rule77"));
+    }
+    throw std::logic_error("ConcreteCM fallback enum value outside declared rules");
 }
 
 } // namespace quake

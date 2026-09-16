@@ -34,6 +34,7 @@ enum class ConcreteCMRule : int {
     NestedNegativeTarget = 11,
     NestedPositiveTarget = 12,
     CompressionReversalTransition = 77,
+    TensionReversalTransition = 88,
 };
 
 struct ConcreteCMState {
@@ -75,6 +76,12 @@ struct ConcreteCMState {
     double compression_rejoin_stress{};
     double compression_rejoin_tangent{};
 
+    // OpenSees primary Ter0p/Tfr0p history introduced by a positive reversal
+    // from rule 4. Derived rule-88 landmarks are reconstructed from these
+    // values and Teunp/Tfunp rather than persisted.
+    double positive_return_reversal_strain{};
+    double positive_return_reversal_stress{};
+
     // OpenSees nested rule-12/rule-11 history for the rule77 provenance.
     // Tea and Teb are persistent targets across reversals; Ter/Tfr are the
     // moving origins of the current rule 12 or rule 11 transition.
@@ -84,6 +91,7 @@ struct ConcreteCMState {
     double nested_positive_origin_stress{};
     double nested_negative_origin_strain{};
     double nested_negative_origin_stress{};
+    bool nested_negative_target_uses_rule77{false};
 
     // Second negative-to-positive reversal. Gate 4 currently admits only
     // the retained-prior-tension-history branch exercised by the frozen
