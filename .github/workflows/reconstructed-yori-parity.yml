@@ -36,6 +36,12 @@ jobs:
             fi
           done < gate4_source_snapshot/changed_files.txt
           cat gate4_source_snapshot/changed_files.txt
+      - name: Upload runtime source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate4-source-snapshot
+          path: gate4_source_snapshot/
+          if-no-files-found: error
       - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
       - name: Install OpenSeesPy 3.8.0
         run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
