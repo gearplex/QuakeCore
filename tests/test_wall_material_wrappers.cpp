@@ -41,6 +41,9 @@ void verify_concrete_bridge(const ConcreteCMParameters& p){
         const auto dr=direct.trial(strain,ds);const auto wr=wall.trial(strain,ws.data(),wt.data());
         near(wr.stress,dr.response.stress,1e-11,"ConcreteCM wall bridge stress");near(wr.tangent,dr.response.tangent,1e-11,"ConcreteCM wall bridge tangent");
         ds=dr.state;ws=wt;
+        std::vector<double> replay(wall.state_size());const auto cr=wall.trial(strain,ws.data(),replay.data());
+        near(cr.stress,ds.stress,1e-11,"ConcreteCM committed replay stress");near(cr.tangent,ds.tangent,1e-11,"ConcreteCM committed replay tangent");
+        check(replay==ws,"ConcreteCM committed replay changed state");
     }
 }
 int main(){try{
@@ -80,8 +83,11 @@ int main(){try{
         if(step==260){near(r.stress,-.0008,1e-12,"wrapped oracle step260 stress");near(r.tangent,.010289999414142598,1e-12,"wrapped oracle step260 tangent");near(work,23.6520071042302,1e-10,"wrapped oracle step260 work");}
         if(step==280){near(r.stress,0.0,1e-12,"wrapped oracle step280 stress");near(r.tangent,.010289999414142598,1e-12,"wrapped oracle step280 tangent");near(work,23.6519751042302,1e-10,"wrapped oracle step280 work");}
         previous_stress=r.stress;previous_strain=protocol[step];ws=wt;
+        std::vector<double> replay(wrapped.state_size());const auto sr=wrapped.trial(protocol[step],ws.data(),replay.data());
+        near(sr.stress,r.stress,1e-10,"wrapped committed replay stress");near(sr.tangent,r.tangent,1e-10,"wrapped committed replay tangent");
+        check(replay==ws,"wrapped committed replay changed state");
     }
     check(protocol.size()==281,"wrapped full protocol size");
     auto post=wrapped.trial(.01,ws.data(),wt.data());near(post.stress,.0001,1e-12,"wrapped permanent failure stress");near(post.tangent,.010289999414142598,1e-12,"wrapped permanent failure tangent");
-    std::cout<<"wall material bridges, full sampled Pinching4-MinMax-Parallel lifecycle, rollback, and failure checks passed\n";return 0;
+    std::cout<<"wall material bridges, committed replay idempotence, full sampled Pinching4-MinMax-Parallel lifecycle, rollback, and failure checks passed\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
