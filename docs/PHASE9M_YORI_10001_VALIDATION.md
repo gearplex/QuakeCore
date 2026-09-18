@@ -1,8 +1,8 @@
 # QuakeCore–OpenSees Wall Archetype 10001 Validation Report
 
-**Date:** September 10, 2026  
+**Date:** September 17, 2026  
 **Scope:** Three-story special nonbearing reinforced-concrete wall archetype 10001, treated as the first building-frame-system comparison  
-**Status:** Validation Gates 1–3 passed; Gate 4 is open; FEMA P-695 collapse/R-factor conclusions are not yet authorized
+**Status:** Gates 1–3 passed for the corrected/matched fixture; Gate 4 engineering parity passed for the documented reconstructed surrogate; FEMA P-695 collapse/R-factor conclusions are not authorized
 
 ## Executive conclusion
 
@@ -17,7 +17,9 @@ For the matched gravity/P-Delta benchmark, the maximum difference between the fu
 
 Across seven timed repetitions of that benchmark, median integration time was **0.1897 s in QuakeCore** and **0.1823 s in OpenSees**, making QuakeCore **1.04× the OpenSees time** on this small model. This is functional speed parity, not yet evidence of superior large-suite throughput. The available environment used QuakeCore's dense LAPACK verification fallback because SuperLU was unavailable; the production sparse path should be benchmarked before making scaling claims.
 
-The exact YORi collapse model is **not yet reproduced in QuakeCore**. It depends on ConcreteCM, Pinching4, MinMax, and Parallel material behavior. ConcreteCM and Pinching4 are path-dependent cyclic models whose unloading, reloading, pinching, and degradation rules can directly control collapse. Substituting Concrete01, Steel01, and bilinear shear is suitable for solver verification, but not for an R-factor determination. Accordingly, no CMR, SSF, ACMR, or FEMA P-695 pass/fail result is reported here.
+Gate 4 subsequently promoted independently implemented ConcreteCM, Pinching4, MinMax, and Parallel behavior into normal QuakeCore source and established **engineering parity for the documented reconstructed three-story surrogate**. The required gate now covers modal response, global drift response, MVLEM shear/axial/bottom-moment demands, constitutive replay through the independently converged OpenSees window, and clean source-level regression coverage. The strict full-trace comparator remains a diagnostic because the independent OpenSees nominal 1.0x analysis stops at approximately 11.46 s under the current Newton settings while QuakeCore completes the record.
+
+This does not convert the reconstructed surrogate into the lost received model. The lost source SHA-256 remains `02eca2fbdde5d2cc1400be354802a2b26d6d79ce15ac94dd981cd26dc6b23104`; the documented surrogate SHA-256 is `22203092a1d125d59ced2a3777a9120ba9209d190ea32f6c71107f9c97403cf3`. No CMR, SSF, ACMR, collapse qualification, FEMA P-695 pass/fail result, code approval, or R-factor recommendation is reported here.
 
 ## Archetype frozen for comparison
 
@@ -147,7 +149,16 @@ Seven integration-only repetitions of the final matched-law benchmark produced:
 | QuakeCore, dense LAPACK verification path | 0.1897 s | 0.1814–0.2077 s |
 | OpenSeesPy 3.8.0 | 0.1823 s | 0.1749–0.1852 s |
 
-QuakeCore was 4.1% slower at the median on this three-story fixture. That is effectively parity for the immediate validation question, but it is too small a model to assess sparse-solver scaling or parallel IDA throughput. The earlier packaged executable was about 11.6× slower than OpenSees in a different environment; the current result shows that the large deficit is not inherent to the governing equations, but a production SuperLU benchmark and multi-record wall suite are still needed.
+QuakeCore was 4.1% slower at the median on this earlier three-story matched-law fixture. That result remains useful as the simple-law baseline.
+
+Gate 4 added a paired/interleaved 1,000-step **exact-law reconstructed-surrogate** benchmark with one warm-up per solver and seven alternating-order measurements:
+
+| Engine | Median |
+|---|---:|
+| QuakeCore exact-law path | 0.212844 s |
+| OpenSeesPy 3.8.0 exact-law path | 0.284012 s |
+
+The median-ratio speedup was **1.334x**; the median of paired speedup factors was **1.3319x**, with a paired range of **1.302x–1.343x**. This supports a benchmark-specific roughly 33% QuakeCore advantage on the current application path, but it is not a general speed factor. The earlier simple-law benchmark was slightly slower in QuakeCore, and broader record/model-size testing is required before making a general throughput claim.
 
 ## Confirmed and unresolved errors in the received evaluation
 
@@ -170,18 +181,60 @@ QuakeCore was 4.1% slower at the median on this three-story fixture. That is eff
 
 `P695Far FieldNormalizedResponseSpect.txt` has 46 columns: period, the median normalized spectrum, and 44 individual record spectra. At T = 0.41 s, column 2 is 0.82851156 and equals the median of the 44 individual values to the displayed precision. Therefore, use of `NormalizedResposeSpect[idx,1]` as a common suite denominator appears intentional for collective record-set scaling and is **not listed as an error**. This should nevertheless be documented in code because the variable name `GM_SaT1` suggests a record-specific value.
 
-## Gate 4 — Exact constitutive parity remains open
+## Gate 4 — Reconstructed-surrogate engineering parity passed
 
-The received wall fibers use ConcreteCM in Parallel with reinforcing steel that includes Pinching4 and MinMax behavior. A collapse comparison cannot be considered analogous until the following are verified against OpenSees under monotonic and reversing protocols:
+Gate 4 is accepted for **software/model engineering parity of the documented reconstructed three-story surrogate**. The accepted implementation uses promoted ConcreteCM + Pinching4 + MinMax + Parallel behavior in normal source; the reconstructed validation workflow applies no runtime source patches.
 
-1. ConcreteCM compression and tension envelopes.
-2. Concrete unloading/reloading, crack closure, and cyclic degradation.
-3. Pinching4 positive and negative envelopes, pinched reload paths, and all selected degradation modes.
-4. MinMax failure-state behavior and state persistence.
-5. Parallel force summation and tangent/state commit/revert behavior.
-6. MVLEM fiber strain mapping and shear-flexure interaction using those exact laws.
+### Production-source stabilization
 
-The current Concrete01/Steel01/bilinear-shear model is intentionally labeled **matched-law verification**, not the final YORi archetype. A clean-room implementation with point-by-point OpenSees material tests is the preferred path. A calibrated surrogate could be used only if it matches cyclic energy, residual deformation, strength loss, unloading stiffness, and collapse-driving response over representative wall protocols and the substitution is accepted as part of the FEMA P-695 methodology.
+- Validated ConcreteCM/state-persistence behavior was promoted in commit `008b6dc17853d547f9d8bf7c1f525fac304a57f8`.
+- Exact committed-deformation replay for ConcreteCM and Pinching4 is idempotent and does not advance path-dependent history.
+- ConcreteCM persisted state is 37 slots and wrapper/MVLEM state sizing has been updated accordingly.
+- The former 9.57 s material discrepancy was traced to response extraction re-trialing an already committed path-dependent material; the source-level fix eliminates that discrepancy.
+- Obsolete runtime patch scripts and temporary migration scaffolding were removed.
+- Final sanitizer ON/OFF CI, CTest, smoke benchmarks, and reconstructed engineering validation are green.
+
+### Required engineering acceptance criteria
+
+The required gate in `validation/yori_wall_10001/assess_engineering_parity.py` requires:
+
+1. QuakeCore completion of the nominal reconstructed record.
+2. At least 1,000 independently converged common OpenSees nominal steps.
+3. Modal-period relative error <= `1e-6`.
+4. Peak story-drift relative error <= `0.1%`.
+5. Story-drift history RMSE <= `0.1%` of peak.
+6. Wall peak shear/axial/bottom-moment EDP relative error <= `1%`.
+
+The stabilized workflow passes all required checks.
+
+### Nominal reconstructed 1.0x comparison
+
+- QuakeCore completes all 2,999 nominal steps.
+- Independent OpenSees full Newton completes 1,145 nominal steps and stops at approximately 11.46 s after 100 iterations.
+- Maximum relative difference in the first three modal periods: `1.52235e-12`.
+- Maximum relative peak story-drift difference in the common response: `3.25121e-13`.
+- Worst story-drift history RMSE: `0.0252463%` of peak.
+- Dedicated five-MVLEM comparison checks shear, axial force, and bottom moment.
+- Maximum relative peak wall EDP difference: `1.47183e-12`.
+- Maximum absolute six-component wall-force history difference: `1.40012e-08`.
+- The first ConcreteCM replay discrepancy greater than `1e-6` is at 11.46 s, coincident with the independent OpenSees system noncompletion.
+
+The strict full-trace comparator remains in CI as a **non-blocking diagnostic**. It is intentionally more stringent than the engineering acceptance gate and is not reclassified as a pass when OpenSees itself does not finish the record.
+
+### Multi-intensity diagnostic
+
+The same reconstructed model and record were exercised at dimensionless acceleration/PGA multipliers of 0.5x, 1.0x, 2.0x, and 4.0x. These are not Sa(T1), collapse capacities, FEMA P-695 intensity measures, or code qualification results.
+
+| Multiplier | Solver completion | Peak-drift relative difference | Worst drift RMSE / peak | Max wall peak EDP relative difference |
+|---|---|---:|---:|---:|
+| 0.5x | both complete 2,999 steps | 0.00768% | 0.00409% | 0.0790% |
+| 1.0x | QC 2,999; OS 1,145 | ~3.54e-13 | 0.02525% | 0.117% |
+| 2.0x | QC 2,999; OS 1,018 | 0.00166% | 0.000446% | 0.0207% |
+| 4.0x | both reach 553 nominal steps, then numerical noncompletion | 0.00383% | 0.00131% | 0.0767% |
+
+The 0.5x case is the cleanest current full-record independent exact-law comparison. The 4.0x endpoint is numerical noncompletion under the present algorithms/settings and is **not** labeled collapse.
+
+A separate OpenSees recursive-subdivision diagnostic reduced the nominal 0.01 s step to 1/64 near the 1.0x stopping point and still did not advance materially beyond approximately 11.453 s. This supports treating the stop as an OpenSees/Newton path limitation for the reconstructed model rather than evidence of a QuakeCore-only constitutive error.
 
 ## Gate status and next sequence
 
@@ -190,11 +243,17 @@ The current Concrete01/Steel01/bilinear-shear model is intentionally labeled **m
 | 1. Freeze/correct OpenSees 10001 | Passed, with damping-anchor decision still flagged |
 | 2. Resolve solver/history delta and speed | Passed for matched laws |
 | 3. Gravity-state transfer and P-Delta | Passed for the benchmark fixture |
-| 4. Exact cyclic material parity | Open; current technical stop |
-| 5. Full exact-law QuakeCore/OpenSees comparison | Not run pending Gate 4 |
-| 6. FEMA P-695 suite, CMR, SSF, ACMR, acceptance | Not run pending Gates 4 and 5 |
+| 4. Exact-law implementation + reconstructed-surrogate engineering parity | **Passed for the documented surrogate** |
+| 5. Multi-record external exact-law validation | Next phase |
+| 6. FEMA P-695 suite, CMR, SSF, ACMR, acceptance | Not authorized pending broader validation and collapse-workflow controls |
 
-The next defensible work item is a material-level validation harness, followed by one exact-law record at multiple intensities, then the 44-record suite. FEMA P-695 statistics should only be generated after collapse status, record scaling, censoring, nonmonotonic response, and numerical failures are stored explicitly for every run.
+The next defensible work item is a **multi-record exact-law external-validation suite**, not further tuning of the single nominal record. Freeze the current Gate 4 thresholds, preserve explicit record/scaling provenance, compare drift/residual drift/acceleration/base and story shear/wall force and moment/axial demand/dissipated energy, and keep completed analysis, response-limit crossing, numerical noncompletion, and collapse classification distinct. Runtime testing should remain paired/interleaved and expand across model sizes and records before making a general performance claim.
+
+Only after that evidence is stable should the FEMA P-695-specific collapse/statistical workflow proceed, with explicit censoring, nonmonotonic-response handling, actual applied intensity measures, and auditable solver-recovery ledgers.
+
+### Claim boundary
+
+Gate 4 does **not** establish identity to the lost received source, physical validation, FEMA P-695 acceptance, collapse qualification, code approval, product prequalification, or an approved/recommended YORi R factor.
 
 ## Deliverable contents
 
