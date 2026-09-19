@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-09-19T15:10:44Z",
+  "record_set": "FEMA P-695 / ATC-63 far-field ground-motion set",
+  "intended_use": "Phase 9N external software/model validation; not yet FEMA P-695 collapse qualification",
+  "public_source": {
+    "host": "SP3 / Haselton Baker Risk Group public ground-motion set mirror",
+    "landing_page": "https://www.hbrisk.com/sp3-ground-motion-sets",
+    "files": [
+      {
+        "name": "1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls",
+        "url": "https://s3-us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls",
+        "sha256": "e775ee429b4311dc1c8b362b78640523fa331445a46e8cee8f15138f9acde1bb"
+      },
+      {
+        "name": "2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip",
+        "url": "https://s3.us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip",
+        "sha256": "340ea47176323c363634b456c317e553dbcfced503f3e82827355a23145b9638"
+      },
+      {
+        "name": "2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip",
+        "url": "https://s3.us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip",
+        "sha256": "4b27774cafba4cef394fcda21a037ac08a452b3006e5899daddc47dd8d832b42"
+      }
+    ]
+  },
+  "integrity": {
+    "transfer_artifact_id": 10587120572,
+    "transfer_artifact_sha256": "0ef32255e27effb216b33ac22147409525a1a49d8ad64146ef65db8c10e4d7d9",
+    "archive_tests": "Both source ZIPs passed unzip -t with no errors.",
+    "sorted_horizontal_component_count": 44,
+    "known_phase9m_record": "SortedEQFile_(120111).txt"
+  },
+  "storage": {
+    "raw_bytes_in_public_repo": false,
+    "private_archive": "Google Drive/YORi - QuakeCore Validation Data/01_Source_Records/FEMA_P695_FarField_SourcePackages_SP3_2026-09-19.zip",
+    "rationale": "Keep public GitHub limited to manifests/provenance/scripts; retain raw record packages and analysis outputs in private project storage."
+  },
+  "copyright_boundary": {
+    "note": "PEER/NGA records are subject to source terms/copyright. Do not treat this manifest as a redistribution license. Preserve original provenance and review source terms before external redistribution.",
+    "peer_database": "https://ngawest2.berkeley.edu/"
+  }
+}
