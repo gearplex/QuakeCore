@@ -8,6 +8,7 @@ on:
       - validation/yori_wall_10001/phase9n_build_record_manifest.py
       - validation/yori_wall_10001/phase9n_materialize_record_job.py
       - validation/yori_wall_10001/compare_phase9n_record_suite.py
+      - validation/yori_wall_10001/phase9n_aggregate_suite.py
       - validation/yori_wall_10001/compare_reconstructed_exact_10001.py
       - validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt
   pull_request:
@@ -17,12 +18,17 @@ on:
       - validation/yori_wall_10001/phase9n_build_record_manifest.py
       - validation/yori_wall_10001/phase9n_materialize_record_job.py
       - validation/yori_wall_10001/compare_phase9n_record_suite.py
+      - validation/yori_wall_10001/phase9n_aggregate_suite.py
       - validation/yori_wall_10001/compare_reconstructed_exact_10001.py
       - validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt
   workflow_dispatch:
 
 jobs:
-  full-far-field-suite:
+  far-field-shard:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +75,7 @@ jobs:
                   zf.write(root / name, arcname=name)
           PY
 
-      - name: Build metadata-only 44-component record manifest
+      - name: Build metadata-only record manifest
         run: |
           python validation/yori_wall_10001/phase9n_build_record_manifest.py \
             --source-archive phase9n_source_archive.zip \
@@ -79,7 +85,6 @@ jobs:
           m=json.load(open("phase9n_record_manifest.json"))
           assert m["component_count"] == 44
           assert m["pair_count"] == 22
-          print("record IDs:", " ".join(r["record_id"] for r in m["records"]))
           PY
 
       - name: Materialize reconstructed exact-law base job
@@ -89,6 +94,7 @@ jobs:
             --output reconstructed_job.json
 
       - name: Verify Phase 9M source reproduction
+        if: matrix.shard == 0
         run: |
           python validation/yori_wall_10001/phase9n_materialize_record_job.py \
             --base-job reconstructed_job.json \
@@ -108,19 +114,23 @@ jobs:
           assert len(a) == len(b) == 2999
           assert err <= 1e-12
           PY
-          rm reproduced_120111.json
 
-      - name: Run all 44 far-field components at Phase 9M source scale
+      - name: Run far-field shard
         shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
           set -euo pipefail
           mapfile -t IDS < <(python - <<'PY'
-          import json
+          import json, os
+          shard=int(os.environ["SHARD"])
           m=json.load(open("phase9n_record_manifest.json"))
-          for r in m["records"]:
-              print(r["record_id"])
+          for i,r in enumerate(m["records"]):
+              if i % 4 == shard:
+                  print(r["record_id"])
           PY
           )
+          echo "Shard ${SHARD}: ${IDS[*]}"
           python validation/yori_wall_10001/compare_phase9n_record_suite.py \
             --base-job reconstructed_job.json \
             --source-archive phase9n_source_archive.zip \
@@ -128,29 +138,56 @@ jobs:
             --quake-exe ./build/quake_run \
             --record-ids "${IDS[@]}" \
             --scale 0.03 \
-            --out-dir phase9n_full_suite \
+            --out-dir phase9n_shard \
             --assert-engineering-parity
 
-      - name: Upload Phase 9N suite summary
+      - name: Upload shard summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase9n-yori-44-summary
+          name: phase9n-yori-44-shard-${{ matrix.shard }}
           retention-days: 14
           if-no-files-found: warn
           path: |
             phase9n_record_manifest.json
-            phase9n_full_suite/suite_summary.json
-            phase9n_full_suite/*/comparison.json
-            phase9n_full_suite/*/quakecore_stdout.txt
+            phase9n_shard/suite_summary.json
+            phase9n_shard/*/comparison.json
+            phase9n_shard/*/quakecore_stdout.txt
 
-      - name: Upload Phase 9N full QuakeCore outputs for Drive handoff
+      - name: Upload shard full QuakeCore outputs for Drive handoff
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase9n-yori-44-full-outputs
+          name: phase9n-yori-44-full-outputs-shard-${{ matrix.shard }}
           retention-days: 1
           if-no-files-found: warn
           compression-level: 9
-          path: |
-            phase9n_full_suite/*/quakecore.json
+          path: phase9n_shard/*/quakecore.json
+
+  aggregate:
+    needs: far-field-shard
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download shard summaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: phase9n-yori-44-shard-*
+          path: phase9n_shards
+
+      - name: Aggregate and enforce full-suite response parity
+        run: |
+          python validation/yori_wall_10001/phase9n_aggregate_suite.py \
+            --root phase9n_shards \
+            --out phase9n_44_aggregate_summary.json
+
+      - name: Upload aggregate summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9n-yori-44-aggregate
+          retention-days: 30
+          if-no-files-found: error
+          path: phase9n_44_aggregate_summary.json
