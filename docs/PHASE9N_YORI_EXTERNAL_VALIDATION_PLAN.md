@@ -178,7 +178,21 @@ Phase 9N is ready to close when:
 - new diagnostic metrics are summarized without retroactively chosen pass thresholds; and
 - the team has a documented decision on whether to begin the separate FEMA P-695 collapse/statistical workflow.
 
-## 11. Immediate blocker/input
+## 11. Record-source status
 
-The code path can be generalized from the existing Phase 9M harness, but a reproducible Phase 9N multi-record batch requires the actual additional ground-motion records plus provenance. Do not reconstruct or silently substitute record histories from names alone.
+The FEMA P-695 / ATC-63 far-field source set has now been acquired from the public SP3 / Haselton Baker Risk Group ground-motion mirror and archived in the project's private Google Drive data store.
+
+Permanent public-repository provenance is recorded in:
+
+`validation/yori_wall_10001/phase9n_record_source_manifest.json`
+
+The archived package contains:
+
+- the ATC-63/FEMA P-695 far-field summary workbook;
+- the unscaled original PEER-NGA archive;
+- the sorted 44-horizontal-component text archive, including `SortedEQFile_(120111).txt`, which is the Phase 9M comparison record;
+- SHA-256 checksums; and
+- an archive inventory.
+
+Raw ground-motion bytes are intentionally not retained in the public QuakeCore repository. The next implementation step is to build the Phase 9N record manifest/parser and batch runner against the archived source set while preserving the original record IDs and provenance.
 
