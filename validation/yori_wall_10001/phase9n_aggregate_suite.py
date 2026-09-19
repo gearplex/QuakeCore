@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from completion_status import completion_status
 
 
 def vmax(results, key, default=float("-inf")):
@@ -22,6 +23,10 @@ def main():
     if not summary_files:
         raise SystemExit("no shard suite_summary.json files found")
     shards = [json.loads(p.read_text()) for p in summary_files]
+    for shard in shards[1:]:
+        for key in ("dimensionless_acceleration_scale", "frozen_gate4_thresholds"):
+            if shard[key] != shards[0][key]:
+                raise SystemExit(f"inconsistent shard {key}")
     results = []
     for shard in shards:
         results.extend(shard.get("results", []))
@@ -33,10 +38,18 @@ def main():
     if len(ids) != 44:
         raise SystemExit(f"expected 44 unique records, found {len(ids)}")
 
+    # Reclassify legacy summaries from preserved solver-specific evidence.
+    # Response results and frozen acceptance checks are intentionally untouched.
+    for r in results:
+        r["completion_status"] = completion_status(
+            r["quakecore_status"], r["opensees_status"],
+            r["quakecore_steps"], r["opensees_steps"])
+
     completed_both = [r["record_id"] for r in results if r["completion_status"]["both_completed"]]
     shared_stop = [r["record_id"] for r in results if r["completion_status"]["shared_numerical_noncompletion_same_step"]]
     os_limited = [r["record_id"] for r in results if r["completion_status"]["opensees_reference_limited"]]
     qc_limited = [r["record_id"] for r in results if r["completion_status"]["quakecore_limited"]]
+    dual_stop = [r["record_id"] for r in results if r["completion_status"]["dual_numerical_noncompletion_different_steps"]]
     response_pass = [r["record_id"] for r in results if r["passed_frozen_gate4_response_metrics"]]
 
     out = {
@@ -53,6 +66,7 @@ def main():
         "completion_status": {
             "both_completed": completed_both,
             "shared_numerical_noncompletion_same_step": shared_stop,
+            "dual_numerical_noncompletion_different_steps": dual_stop,
             "opensees_reference_limited": os_limited,
             "quakecore_limited": qc_limited,
         },

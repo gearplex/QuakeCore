@@ -126,8 +126,11 @@ def main():
         ]
         q_peak_common = np.max(np.abs(qarr[:n, 4:7]), axis=0)
         o_peak_common = np.max(np.abs(oh[:n, 4:7]), axis=0)
+        peak_drift_rel = float(np.max(np.abs(q_peak_common - o_peak_common) /
+            np.maximum(np.maximum(np.abs(q_peak_common), np.abs(o_peak_common)), 1e-30)))
     else:
         max_u = max_d = float("inf")
+        peak_drift_rel = float("inf")
         drift_rmse = [float("inf")] * 3
         q_peak_common = o_peak_common = np.asarray([float("inf")] * 3)
 
@@ -166,6 +169,9 @@ def main():
         "max_floor_displacement_difference_in": max_u,
         "max_story_drift_difference": max_d,
         "story_drift_rmse_percent_of_peak": drift_rmse,
+        "peak_story_drift_relative_difference": peak_drift_rel,
+        "peak_story_drift_within_frozen_gate4_tolerance_diagnostic": peak_drift_rel <= 1e-3,
+        "story_drift_history_within_frozen_gate4_tolerance_diagnostic": max(drift_rmse) <= 0.1,
         "quakecore_peak_story_drift_common": q_peak_common.tolist(),
         "opensees_peak_story_drift_common": o_peak_common.tolist(),
         "max_wall_peak_edp_relative_difference": max_wall_peak_rel,

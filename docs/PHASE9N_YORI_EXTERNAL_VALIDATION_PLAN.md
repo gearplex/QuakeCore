@@ -194,5 +194,46 @@ The archived package contains:
 - SHA-256 checksums; and
 - an archive inventory.
 
-Raw ground-motion bytes are intentionally not retained in the public QuakeCore repository. The next implementation step is to build the Phase 9N record manifest/parser and batch runner against the archived source set while preserving the original record IDs and provenance.
+Raw ground-motion bytes are intentionally not retained in the public QuakeCore repository. The manifest/parser and batch runner have been implemented and the initial 44-component suite has run.
 
+## 12. September 19 reporting correction and current disposition
+
+The archived run at `c7b0d6a23bbdb80e877f23a5ccd42b950bb1b3e8` has been
+reaggregated without rerunning mechanics or modifying any response metric.
+The completion taxonomy is exhaustive: 28 both completed, 5 both stopped at
+the same nominal step, 2 both stopped at different steps, 9 OpenSees-reference
+limited, and 0 QuakeCore-only limited. The two asymmetric dual stops are
+`121011` (2374 / 1981 steps) and `121211` (4567 / 7283 steps), QuakeCore /
+OpenSees respectively. Solver-specific step counts remain in each result.
+
+Strict acceptance remains **43/44**, with `120521` failing the unchanged
+minimum 1000-common-step requirement (798 available). The aggregator continues
+to return a failing exit status. All original strict-window EDPs are unchanged.
+
+The separate adaptive OpenSees diagnostic completes `120521`, but its archived
+peak drifts imply relative differences of **0.312055%, 0.301707%, 0.268293%**,
+using the same symmetric peak denominator as the strict comparator. Thus the
+full-record diagnostic exceeds BOTH the frozen 0.1% peak-drift criterion and
+the 0.1% history-RMSE criterion (maximum 0.367166%). Its maximum wall peak
+force-EDP difference is 0.360549%, within 1%. The diagnostic now explicitly
+reports the previously omitted peak-drift comparison.
+
+Disposition: **strict reference-window failure with adaptive numerical-path
+sensitivity; unresolved for full-record frozen parity**. This is not a pass,
+not physical collapse, and not proof of a production mechanics defect. Do not
+use the favorable force comparison to imply all engineering EDP gates pass.
+The original 120521 diagnostic and strict result remain separate evidence.
+
+Before using this mechanics path for collapse IDA, investigate the first
+failed nominal interval (7.98–7.99 s), committed-state/branch events, and a
+predeclared time-step refinement study. Keep interpolation, input phase,
+constitutive laws, tolerances and thresholds fixed across comparison runs.
+Report results even if refinement worsens agreement. No source-mechanics
+change or relaxation of frozen criteria is justified by this audit alone.
+
+The four original full-output artifacts have been hash-verified and preserved
+in the existing private project archive. Shards 2 and 3 are stored as ordered
+byte parts due to the transfer size limit; concatenation restores the original
+artifact ZIP and SHA-256. The private archive ledger records file identities,
+part hashes, byte counts, and reconstruction instructions. Future full-output
+artifact retention is increased from 1 to 14 days.

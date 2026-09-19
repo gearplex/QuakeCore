@@ -23,6 +23,7 @@ import openseespy.opensees as ops
 
 from compare_reconstructed_exact_10001 import build, gravity
 from phase9n_materialize_record_job import load_record, materialize
+from completion_status import completion_status
 
 
 def qwall(row, wid):
@@ -194,16 +195,7 @@ def run_record(base_job, source_archive, manifest, record_id, scale, quake_exe, 
         "wall_peak_edp_relative_difference_le_1_percent": max_wall_peak_rel <= 0.01,
     }
     response_passed = all(response_checks.values())
-    completion = {
-        "both_completed": q_status == "completed" and o_status == "completed",
-        "shared_numerical_noncompletion_same_step": (
-            q_status == "numerical_noncompletion"
-            and o_status == "numerical_noncompletion"
-            and len(qh) == len(oh)
-        ),
-        "opensees_reference_limited": q_status == "completed" and o_status == "numerical_noncompletion",
-        "quakecore_limited": q_status == "numerical_noncompletion" and o_status == "completed",
-    }
+    completion = completion_status(q_status, o_status, len(qh), len(oh))
     q_stats = qrun.get("stats", {})
     result = {
         "record_id": record_id,
@@ -324,6 +316,7 @@ def main():
             "records_passing_frozen_gate4_response_metrics": [r["record_id"] for r in valid if r["passed_frozen_gate4_response_metrics"]],
             "records_completed_by_both": [r["record_id"] for r in valid if r["completion_status"]["both_completed"]],
             "records_with_shared_numerical_noncompletion_same_step": [r["record_id"] for r in valid if r["completion_status"]["shared_numerical_noncompletion_same_step"]],
+            "records_with_dual_numerical_noncompletion_different_steps": [r["record_id"] for r in valid if r["completion_status"]["dual_numerical_noncompletion_different_steps"]],
             "records_limited_by_opensees_reference": [r["record_id"] for r in valid if r["completion_status"]["opensees_reference_limited"]],
             "records_limited_by_quakecore_only": [r["record_id"] for r in valid if r["completion_status"]["quakecore_limited"]],
             "minimum_common_steps": min((r["common_steps"] for r in valid), default=0),

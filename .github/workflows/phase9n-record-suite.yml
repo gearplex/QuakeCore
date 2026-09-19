@@ -8,6 +8,7 @@ on:
       - validation/yori_wall_10001/phase9n_build_record_manifest.py
       - validation/yori_wall_10001/phase9n_materialize_record_job.py
       - validation/yori_wall_10001/compare_phase9n_record_suite.py
+      - validation/yori_wall_10001/completion_status.py
       - validation/yori_wall_10001/phase9n_aggregate_suite.py
       - validation/yori_wall_10001/compare_reconstructed_exact_10001.py
       - validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt
@@ -18,6 +19,7 @@ on:
       - validation/yori_wall_10001/phase9n_build_record_manifest.py
       - validation/yori_wall_10001/phase9n_materialize_record_job.py
       - validation/yori_wall_10001/compare_phase9n_record_suite.py
+      - validation/yori_wall_10001/completion_status.py
       - validation/yori_wall_10001/phase9n_aggregate_suite.py
       - validation/yori_wall_10001/compare_reconstructed_exact_10001.py
       - validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt
@@ -32,6 +34,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify completion taxonomy
+        run: python -m unittest discover -s validation/yori_wall_10001 -p test_completion_status.py
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
@@ -159,7 +164,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: phase9n-yori-44-full-outputs-shard-${{ matrix.shard }}
-          retention-days: 1
+          retention-days: 14
           if-no-files-found: warn
           compression-level: 9
           path: phase9n_shard/*/quakecore.json
