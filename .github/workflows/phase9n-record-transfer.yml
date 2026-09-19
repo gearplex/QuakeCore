@@ -1,0 +1,48 @@
+name: phase9n-record-transfer
+
+on:
+  push:
+    branches:
+      - phase9m-yori-wall-10001
+    paths:
+      - .github/workflows/phase9n-record-transfer.yml
+  workflow_dispatch:
+
+jobs:
+  fetch-p695-far-field:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download public FEMA P-695 far-field packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p transfer
+          curl -L --fail --retry 3 -o transfer/1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls \
+            https://s3-us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls
+          curl -L --fail --retry 3 -o transfer/2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip \
+            https://s3.us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip
+          curl -L --fail --retry 3 -o transfer/2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip \
+            https://s3.us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip
+          sha256sum transfer/* | tee transfer/SHA256SUMS.txt
+          unzip -t transfer/2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip
+          unzip -t transfer/2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip
+
+      - name: Inventory archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "# Original PEER-NGA archive"
+            unzip -l transfer/2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip
+            echo
+            echo "# Sorted archive"
+            unzip -l transfer/2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip
+          } > transfer/ARCHIVE_INVENTORY.txt
+
+      - name: Upload temporary transfer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9n-p695-far-field-source-packages
+          path: transfer/
+          retention-days: 1
+          if-no-files-found: error
