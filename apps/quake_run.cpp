@@ -5,6 +5,7 @@
 #include "quake/frame2d.hpp"
 #include "quake/ida.hpp"
 #include "quake/modal.hpp"
+#include "quake/static_analysis.hpp"
 #include <chrono>
 #include <iostream>
 #include <map>
@@ -15,7 +16,7 @@ static int checked_id(const Json& j){if(!j.is_number_integer()||j.get<double>()<
 static Dof2D dof(const std::string& s){if(s=="UX")return Dof2D::UX;if(s=="UY")return Dof2D::UY;if(s=="RZ")return Dof2D::RZ;throw std::invalid_argument("unsupported 2D DOF "+s);}
 int main(int argc,char** argv){try{
  if(argc!=3){std::cerr<<"Usage: quake_run job.json result.json\n";return 2;}
- const auto job=read_json(argv[1]);keys(job,{"schema","name","units","model","analysis","records","provenance"});
+ const auto job=read_json(argv[1]);keys(job,{"schema","name","units","model","analysis","records","provenance","gravity"});
  if(job.at("schema")!="quakecore.job.v1")throw std::invalid_argument("unsupported job schema");
  keys(job.at("units"),{"force","length","time"});if(job.at("units").at("time")!="s")throw std::invalid_argument("time unit must be s");
  for(const auto* name:{"force","length"})if(!job.at("units").at(name).is_string()||job.at("units").at(name).get<std::string>().empty())throw std::invalid_argument("unit labels must be nonempty strings");
@@ -32,9 +33,9 @@ int main(int argc,char** argv){try{
  for(const auto& f:m.at("fixities")){if(f.size()!=4)throw std::invalid_argument("fixity must be [id,ux,uy,rz]");b.fix(checked_id(f[0]),f[1].get<bool>(),f[2].get<bool>(),f[3].get<bool>());}
  for(const auto& e:m.value("equal_dofs",Json::array())){if(e.size()!=3)throw std::invalid_argument("equal DOF must be [retained,constrained,dof]");b.equal_dof(checked_id(e[0]),checked_id(e[1]),dof(e[2]));}
  for(const auto& e:m.at("members")){
-  if(e.size()!=7)throw std::invalid_argument("member must be [id,i,j,E,A,I,constant_compression]");int id=checked_id(e[0]);if(!elements.insert(id).second)throw std::invalid_argument("duplicate element id");
+  if(e.size()!=7&&e.size()!=8)throw std::invalid_argument("member must be [id,i,j,E,A,I,constant_compression,pdelta_transformation?]");int id=checked_id(e[0]);if(!elements.insert(id).second)throw std::invalid_argument("duplicate element id");
   if(e[3].get<double>()<=0||e[4].get<double>()<=0||e[5].get<double>()<=0)throw std::invalid_argument("member E,A,I must be positive");
-  b.add_elastic_frame(id,checked_id(e[1]),checked_id(e[2]),e[3],e[4],e[5],e[6]);
+  b.add_elastic_frame(id,checked_id(e[1]),checked_id(e[2]),e[3],e[4],e[5],e[6],e.size()==8?e[7].get<bool>():false);
  }
  for(const auto& h:m.value("hinges",Json::array())){
   keys(h,{"id","i","j","type","k","fy","hardening_ratio","a","b","f","c","io","ls","cp","hardening_stiffness","provenance"});
@@ -96,10 +97,24 @@ int main(int argc,char** argv){try{
  std::vector<std::vector<int>> cuts=m.value("story_cut_members",std::vector<std::vector<int>>{});
  for(const auto& cut:cuts)for(int id:cut){bool found=false;for(const auto& e:m.at("members"))if(e[0].get<int>()==id){auto pi=coords.at(e[1].get<int>()),pj=coords.at(e[2].get<int>());if(std::abs(pi.first-pj.first)>1e-10||pj.second<=pi.second)throw std::invalid_argument("story cuts require upward vertical members");found=true;}for(const auto& e:m.value("steel_members",Json::array()))if(e.at("id").get<int>()==id){auto pi=coords.at(e.at("i").get<int>()),pj=coords.at(e.at("j").get<int>());if(e.at("role")!="column"||std::abs(pi.first-pj.first)>1e-10||pj.second<=pi.second)throw std::invalid_argument("steel story cuts require upward vertical column members");found=true;}if(!found)throw std::invalid_argument("unknown story cut member");}
  auto shears=[&](const auto& u,const auto& state){std::vector<double> v;for(const auto& cut:cuts){double sum=0;for(int id:cut){if(model.elastic_element_index(id)>=0)sum-=model.elastic_element_response(id,u).shear_i;else sum-=model.steel_member_response(id,u,state).force[0];}v.push_back(sum);}return v;};
- const auto& control=job.at("analysis");for(const auto* name:{"max_iterations","max_subdivisions","workers","refinements","history_stride"})if(control.contains(name))checked_id(control.at(name));keys(control,{"type","strategy","tolerance","relative_tolerance","initial_guess","max_iterations","max_subdivisions","line_search","history_stride","output_mode","scales","refinements","workers","drift_limit","stop_after_first_collapse"});
- RobustNewmarkOptions o;o.tolerance=control.value("tolerance",1e-8);o.relative_force_tolerance=control.value("relative_tolerance",true);o.max_iterations=control.value("max_iterations",35);o.max_subdivisions=control.value("max_subdivisions",5);o.line_search=control.value("line_search",true);o.return_numerical_failure=true;o.collapse.max_story_drift_ratio=control.value("drift_limit",0.0);if(o.collapse.max_story_drift_ratio<0)throw std::invalid_argument("negative drift_limit");
+ const auto& control=job.at("analysis");for(const auto* name:{"max_iterations","max_subdivisions","workers","refinements","history_stride"})if(control.contains(name))checked_id(control.at(name));keys(control,{"type","strategy","tolerance","relative_tolerance","initial_guess","max_iterations","max_subdivisions","line_search","history_stride","output_mode","scales","refinements","workers","drift_limit","stop_after_first_collapse","check_initial_stability"});
+ RobustNewmarkOptions o;o.tolerance=control.value("tolerance",1e-8);o.relative_force_tolerance=control.value("relative_tolerance",true);o.max_iterations=control.value("max_iterations",35);o.max_subdivisions=control.value("max_subdivisions",5);o.line_search=control.value("line_search",true);o.return_numerical_failure=true;o.collapse.max_story_drift_ratio=control.value("drift_limit",0.0);o.collapse.check_initial_stability=control.value("check_initial_stability",true);if(o.collapse.max_story_drift_ratio<0)throw std::invalid_argument("negative drift_limit");
  const std::string guess=control.value("initial_guess",std::string("kinematic"));if(guess!="kinematic"&&guess!="previous_displacement")throw std::invalid_argument("unknown initial_guess");o.kinematic_initial_guess=guess=="kinematic";
  auto strategy=parse_strategy(control.value("strategy",std::string("woodbury")));
+ std::vector<double> gravity_load(static_cast<std::size_t>(model.dof()),0.0);StaticAnalysisResult gravity_result;bool gravity_performed=false;
+ if(job.contains("gravity")){
+  const auto& g=job.at("gravity");keys(g,{"loads","steps","tolerance","max_iterations","provenance"});
+  if(g.value("provenance",std::string()).empty())throw std::invalid_argument("gravity analysis requires provenance");
+  for(const auto& load:g.at("loads")){
+   if(!load.is_array()||load.size()!=4)throw std::invalid_argument("gravity load must be [node,fx,fy,mz]");
+   const int node=checked_id(load[0]);coords.at(node);
+   for(int j=0;j<3;++j){const int rd=model.reduced_dof(node,static_cast<Dof2D>(j));if(rd>=0)gravity_load[static_cast<std::size_t>(rd)]+=load[static_cast<std::size_t>(j+1)].get<double>();}
+  }
+  const int steps=g.value("steps",100),maxit=g.value("max_iterations",100);if(steps<1||maxit<1)throw std::invalid_argument("invalid gravity step controls");
+  gravity_result=solve_static_load(model,gravity_load,steps,g.value("tolerance",1e-8),maxit);
+  if(!gravity_result.converged)throw std::runtime_error("gravity analysis failed to converge");
+  gravity_performed=true;o.initial_displacement=gravity_result.displacement;o.initial_committed_state=gravity_result.committed_state;o.constant_load=gravity_load;
+ }
  std::vector<GroundMotionRecord> records;std::set<std::string> record_names;
  for(const auto& r:job.at("records")){
   keys(r,{"name","dt","acceleration","sample_convention","provenance"});if(r.at("sample_convention")!="step_end")throw std::invalid_argument("acceleration samples must be a(dt), a(2dt), ...; the initial state assumes a(0)=0");
@@ -107,7 +122,10 @@ int main(int argc,char** argv){try{
  }
  if(records.empty())throw std::invalid_argument("at least one record is required");
  Json out={{"schema","quakecore.result.v1"},{"name",job.value("name",std::string())},{"units",job.at("units")},{"engine","QuakeCore Phase 9L soil springs and piles research"},{"code_compliance","not_assessed"},{"model",m},{"dof",model.dof()},{"provenance",job.value("provenance",Json::object())}};
- const auto start=std::chrono::steady_clock::now();out["modes"]=Json::array();for(const auto& mode:modal_analysis(model,std::min(3,static_cast<int>(floors.size()))))out["modes"].push_back({{"period_s",mode.period},{"floor_shape",model.story_response_values(mode.shape)}});
+ const auto start=std::chrono::steady_clock::now();out["modes"]=Json::array();std::vector<ModeShape> modes;
+ if(gravity_performed){std::vector<double> force,tangents,trial;model.internal_force_and_tangent(gravity_result.displacement,gravity_result.committed_state,force,tangents,trial);auto kt=model.effective_state_tangent_matrix_with_state(gravity_result.displacement,tangents,gravity_result.committed_state,0.0,0.0);modes=modal_analysis_from_stiffness(model,kt,std::min(3,static_cast<int>(floors.size())));}else modes=modal_analysis(model,std::min(3,static_cast<int>(floors.size())));
+ for(const auto& mode:modes)out["modes"].push_back({{"period_s",mode.period},{"floor_shape",model.story_response_values(mode.shape)}});
+ if(gravity_performed)out["gravity"]={{"converged",true},{"steps",gravity_result.load_steps_completed},{"newton_iterations",gravity_result.newton_iterations},{"residual_inf_norm",gravity_result.residual_inf_norm},{"reduced_load",gravity_load},{"displacement",gravity_result.displacement}};
  if(control.at("type")=="nrha"){
   const std::string output_mode=control.value("output_mode",std::string("full"));if(output_mode!="full"&&output_mode!="summary"&&output_mode!="minimal")throw std::invalid_argument("unknown output_mode");out["output_mode"]=output_mode;
   int stride=control.value("history_stride",1);if(stride<1)throw std::invalid_argument("history_stride must be positive");out["runs"]=Json::array();
@@ -140,7 +158,7 @@ int main(int argc,char** argv){try{
  if(model.wall_count())out["wall_scope"]={{"kinematics","two_node_in_plane_small_displacement"},{"sfi_panel_law","explicit_input; fixed_angle_rc is not FSAM"},{"wall_geometric_stiffness",false},{"wall_acceptance_criteria","not_assessed"},{"solver","coupled wall tangent uses direct sparse factorization"}};
  if(model.steel_member_count()||!panel_zone_ids.empty()||!brb_ids.empty()||!damper_ids.empty())out["steel_scope"]={{"steel_members","two-node condensed concentrated-plasticity beams/columns"},{"panel_zones","zero-length rotational joint-shear spring; user supplies backbone"},{"brbs","small-displacement axial bilinear element; fatigue and fracture not modeled"},{"viscous_dampers","memoryless axial power-law dashpot with consistent velocity tangent"},{"member_geometric_stiffness","optional constant compression preload only"},{"acceptance_criteria","not_assessed"},{"solver","coupled member and velocity-dependent tangents use same-pattern sparse refactorization"}};
  if(!soil_spring_ids.empty()||!soil_dashpot_ids.empty()||!pile_lines.empty())out["soil_scope"]={{"soil_springs","directional translational or relative-rotational zero-length springs with explicit user-supplied backbone provenance"},{"py_tz_qz_adapters","bilinear tributary-force conversions; not OpenSees Simple1 material implementations"},{"pile_lines","vertical small-displacement elastic beam-column meshes with coincident fixed soil nodes"},{"radiation_damping","optional local translational or rotational power-law dashpots; no free-field interaction"},{"excluded","liquefaction, pore-pressure generation, pile-group shadowing, kinematic interaction, and SSI-compatible input motion"},{"acceptance_criteria","not_assessed"}};
- out["gravity_analysis_performed"]=false;out["geometric_formulation"]="constant_preload_small_displacement";out["analysis_wall_seconds"]=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();write_json(argv[2],out);
+ out["gravity_analysis_performed"]=gravity_performed;out["geometric_formulation"]=gravity_performed?"gravity_state_transfer_with_optional_member_pdelta":"small_displacement_with_optional_constant_preload_or_member_pdelta";out["analysis_wall_seconds"]=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();write_json(argv[2],out);
  bool failed=false;for(const auto& r:out["runs"])if(r["termination"]=="numerical_failure"||r["termination"]=="initial_instability")failed=true;
  std::cout<<argv[2]<<'\n';return failed?3:0;
 }catch(const std::exception& e){std::cerr<<"QuakeCore job error: "<<e.what()<<'\n';return 2;}}

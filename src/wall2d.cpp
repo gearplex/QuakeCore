@@ -23,9 +23,9 @@ void panel_stiffness(std::array<double,36>& K,const std::array<double,6>& y,cons
 }
 Wall2D::Wall2D(double h,MVLEMProperties p):h_(h),c_(p.c),properties_(std::move(p)) {
     const auto& a=std::get<MVLEMProperties>(properties_);geometry(h,c_,a.density,a.fibers.size());
-    double width=0;for(const auto& f:a.fibers){dimensions(f.width,f.thickness);if(!std::isfinite(f.reinforcement_ratio)||f.reinforcement_ratio<0||f.reinforcement_ratio>=1)throw std::invalid_argument("MVLEM reinforcement ratio must be in [0,1)");x_.push_back(width+f.width/2);width+=f.width;total_mass_+=h*f.width*f.thickness*a.density;offsets_.push_back(state_size_);state_size_+=12;}
+    double width=0;for(const auto& f:a.fibers){dimensions(f.width,f.thickness);if(!std::isfinite(f.reinforcement_ratio)||f.reinforcement_ratio<0||f.reinforcement_ratio>=1)throw std::invalid_argument("MVLEM reinforcement ratio must be in [0,1)");x_.push_back(width+f.width/2);width+=f.width;total_mass_+=h*f.width*f.thickness*a.density;offsets_.push_back(state_size_);state_size_+=f.concrete.state_size()+f.steel.state_size();}
     for(auto& x:x_)x-=width/2;
-    state_size_+=6;
+    shear_offset_=state_size_;state_size_+=a.shear.state_size();
 }
 Wall2D::Wall2D(double h,SFIMVLEMProperties p):h_(h),c_(p.c),properties_(std::move(p)) {
     const auto& a=std::get<SFIMVLEMProperties>(properties_);geometry(h,c_,a.density,a.panels.size());
@@ -38,7 +38,7 @@ std::array<double,6> Wall2D::axial_B(int i) const {double x=x_.at(i);return {0,-
 std::vector<double> Wall2D::initial_state() const {
     std::vector<double> s(state_size_,0);
     if(!is_sfi()){
-        const auto& p=std::get<MVLEMProperties>(properties_);for(std::size_t i=0;i<p.fibers.size();++i){p.fibers[i].concrete.initialize(s.data()+offsets_[i]);p.fibers[i].steel.initialize(s.data()+offsets_[i]+6);}p.shear.initialize(s.data()+state_size_-6);
+        const auto& p=std::get<MVLEMProperties>(properties_);for(std::size_t i=0;i<p.fibers.size();++i){int o=offsets_[i];p.fibers[i].concrete.initialize(s.data()+o);p.fibers[i].steel.initialize(s.data()+o+p.fibers[i].concrete.state_size());}p.shear.initialize(s.data()+shear_offset_);
     }else{const auto& p=std::get<SFIMVLEMProperties>(properties_);for(std::size_t i=0;i<p.panels.size();++i){auto t=p.panels[i].material.initial_state();std::copy(t.begin(),t.end(),s.begin()+offsets_[i]+1);}}
     return s;
 }
@@ -59,14 +59,14 @@ Wall2DResponse Wall2D::trial(const std::array<double,6>& u,const double* s) cons
     if(!is_sfi()){
         const auto& p=std::get<MVLEMProperties>(properties_);
         for(std::size_t i=0;i<p.fibers.size();++i){
-            const auto& f=p.fibers[i];auto y=axial_B(i);double e=dot(y,u);int o=offsets_[i];
-            auto a=f.concrete.trial(e,s+o,r.state.data()+o),b=f.steel.trial(e,s+o+6,r.state.data()+o+6);
+            const auto& f=p.fibers[i];auto y=axial_B(i);double e=dot(y,u);int o=offsets_[i];int co=f.concrete.state_size();
+            auto a=f.concrete.trial(e,s+o,r.state.data()+o),b=f.steel.trial(e,s+o+co,r.state.data()+o+co);
             double A=f.width*f.thickness,V=h_*A,rho=f.reinforcement_ratio;
             for(int j=0;j<6;++j)r.force[j]+=V*((1-rho)*a.stress+rho*b.stress)*y[j];
             outer(r.tangent,y,y,V*((1-rho)*a.tangent+rho*b.tangent));
             r.fiber_strain.push_back(e);r.concrete_stress.push_back(a.stress);r.steel_stress.push_back(b.stress);
         }
-        auto sh=p.shear.trial(r.shear_deformation,s+state_size_-6,r.state.data()+state_size_-6);
+        auto sh=p.shear.trial(r.shear_deformation,s+shear_offset_,r.state.data()+shear_offset_);
         for(int j=0;j<6;++j)r.force[j]+=h_*sh.stress*g[j];
         outer(r.tangent,g,g,h_*h_*sh.tangent);
     }else{

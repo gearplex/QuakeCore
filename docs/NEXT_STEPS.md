@@ -1,5 +1,28 @@
 # Next Development Milestones
 
+
+## Phase 9M / Gate 4 — YORi wall 10001
+
+**Status as of September 17, 2026:** engineering parity is accepted for the documented reconstructed three-story surrogate. The promoted ConcreteCM + Pinching4 + MinMax + Parallel implementation is in normal source, the reconstructed validation workflow uses no runtime patches, and final sanitizer ON/OFF CI plus the engineering-parity workflow are green.
+
+The accepted Gate 4 baseline includes modal properties, global drift response, five-MVLEM shear/axial/bottom-moment demand comparison, constitutive replay through the independently converged OpenSees window, a clean full-record 0.5x two-solver comparison, broader 1x/2x/4x common-window comparisons, and paired exact-law runtime evidence.
+
+Claim boundary:
+
+- reconstructed surrogate SHA-256: `22203092a1d125d59ced2a3777a9120ba9209d190ea32f6c71107f9c97403cf3`;
+- lost received-source SHA-256: `02eca2fbdde5d2cc1400be354802a2b26d6d79ce15ac94dd981cd26dc6b23104`;
+- current evidence is not physical validation, FEMA P-695 acceptance, collapse qualification, code approval, or an R-factor recommendation.
+
+### Next YORi validation phase
+
+1. Freeze the current Gate 4 thresholds and baseline.
+2. Build a multi-record exact-law QuakeCore/OpenSees comparison suite with explicit record and scaling provenance.
+3. Compare modal response, peak/residual drift, floor acceleration, base/story shear, wall shear/axial/moment demand, and dissipated energy over independently converged windows.
+4. Preserve separate run statuses for completed analysis, response-limit crossing, numerical noncompletion, and collapse classification.
+5. Expand paired/interleaved runtime testing across records and model sizes before making a general speed claim.
+6. Only after that evidence is stable, proceed to FEMA P-695-specific collapse statistics, censoring, nonmonotonic-response treatment, and traceable intensity measures.
+
+
 ## Milestone 2A: production-quality CPU baseline
 
 Implemented: same-pattern SuperLU refactorization with retained ordering/permutations/factor structures, fixed CSC topology, and a direct comparison against the exact matrices used by the low-rank path.

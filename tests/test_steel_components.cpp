@@ -1,5 +1,7 @@
 #include "quake/frame2d.hpp"
 #include "quake/newmark.hpp"
+#include "quake/pinching4.hpp"
+#include "quake/pinching4_cycle.hpp"
 #include "quake/steel2d.hpp"
 #include "quake/superlu_solver.hpp"
 
@@ -19,6 +21,37 @@ void near(double x,double y,double tol,const char* why){
     check(std::isfinite(x)&&std::isfinite(y)&&std::abs(x-y)<=tol*std::max({1.0,std::abs(x),std::abs(y)}),why);
 }
 template<class F>void rejects(F f){bool bad=false;try{f();}catch(const std::exception&){bad=true;}check(bad,"invalid steel component was accepted");}
+
+Pinching4EnvelopeParameters yori_steel_pinching4_envelope_parameters(){
+    // Recovered from the frozen OpenSees 3.8.0 story-1 runtime oracle by
+    // intersecting consecutive piecewise-linear envelope segments. The
+    // original source model input is not committed in this repository.
+    std::array<Pinching4Point,4> p{{
+        {0.00204828,59.4},{0.00705517,66.66},{0.0523366,75.9},{0.0654208,33.0}}};
+    std::array<Pinching4Point,4> n{{
+        {-0.00204828,-59.4},{-0.00705517,-66.66},{-0.0523366,-75.9},{-0.0654208,-33.0}}};
+    return {p,n};
+}
+Pinching4Envelope yori_steel_pinching4_envelope(){
+    return Pinching4Envelope(yori_steel_pinching4_envelope_parameters());
+}
+Pinching4 yori_steel_pinching4(){
+    Pinching4CyclicParameters p{};
+    p.envelope=yori_steel_pinching4_envelope_parameters();
+    p.r_disp_positive=p.r_disp_negative=0.6;
+    p.r_force_positive=p.r_force_negative=0.99;
+    p.u_force_positive=p.u_force_negative=0.4;
+    p.gamma_d={0.1,0.0,0.0,0.0};
+    p.gamma_d_limit=2.0;
+    p.gamma_e=10000.0;
+    p.damage_mode=Pinching4DamageMode::Energy;
+    return Pinching4(p);
+}
+void pinching4_near(const Pinching4Envelope& m,double d,double f,double k){
+    auto r=m.response(d);
+    near(r.force,f,1e-11,"Pinching4 steel envelope force oracle");
+    near(r.tangent,k,1e-11,"Pinching4 steel envelope tangent oracle");
+}
 
 SteelMember2DProperties steel(double k=2.0e8,double fy=2.5e5,double b=.02){
     SteelMember2DProperties p;p.E=2.0e8;p.A=.02;p.I=8.0e-4;
@@ -53,6 +86,82 @@ int main(){try{
     rejects([]{auto p=steel();p.E=0;SteelMember2D e(0,0,3,0,p);});
     rejects([]{ViscousDamper2D d({10,.5,0});});
     rejects([]{ViscousDamper2D d({-1,1,0});});
+
+    // Gate 4: OpenSees Pinching4 envelope construction for the frozen YORi
+    // story-1 reinforcing-steel material.
+    {
+        auto m=yori_steel_pinching4_envelope();
+        pinching4_near(m,0.0,0.0,28999.941414259767);
+        pinching4_near(m,0.001,28.99994141425977,28999.941414259767);
+        pinching4_near(m,0.0019,55.09988868709357,28999.941414259767);
+        pinching4_near(m,0.00205,59.4024940032635,1450.0018973854026);
+        pinching4_near(m,0.004,62.22999770316504,1450.0018973854026);
+        pinching4_near(m,0.0072,66.68955359846188,204.05715985559664);
+        pinching4_near(m,0.035,72.36234264244747,204.05715985559664);
+        pinching4_near(m,0.0505,75.52522862020922,204.05715985559664);
+        pinching4_near(m,0.05525,66.34764983720825,-3278.763699729444);
+        pinching4_near(m,0.060,50.77352226349338,-3278.763699729444);
+        pinching4_near(m,0.066,33.00000002921642,5.0442723109520276e-05);
+        pinching4_near(m,0.080,33.000000735414545,5.0442723109520276e-05);
+        pinching4_near(m,-0.004,-62.22999770316504,1450.0018973854026);
+        pinching4_near(m,-0.060,-50.77352226349338,-3278.763699729444);
+        pinching4_near(m,-0.080,-33.000000735414545,5.0442723109520276e-05);
+        rejects([]{std::array<Pinching4Point,4> p{{{.1,1},{.2,2},{.3,3},{.4,4}}};
+                   std::array<Pinching4Point,4> n{{{-.1,-1},{-.2,-2},{-.3,-3},{-.4,-4}}};
+                   p[1].deformation=.05;Pinching4Envelope bad({p,n});});
+    }
+
+    // Gate 4: first Pinching4 positive-to-negative and negative-to-positive
+    // transitions, through positive-envelope re-entry (frozen steel_raw
+    // steps 0-120). The next reversal is intentionally rejected.
+    {
+        auto m=yori_steel_pinching4();
+        auto state=m.initial_state();
+        std::vector<double> protocol{0.0};
+        for(int i=1;i<=20;++i)protocol.push_back(0.001*i/20.0);
+        for(int i=1;i<=20;++i)protocol.push_back(0.001+(0.004-0.001)*i/20.0);
+        for(int i=1;i<=20;++i)protocol.push_back(0.004*(1.0-i/20.0));
+        for(int i=1;i<=20;++i)protocol.push_back(-0.004*i/20.0);
+        for(int i=1;i<=20;++i)protocol.push_back(-0.004*(1.0-i/20.0));
+        for(int i=1;i<=20;++i)protocol.push_back(0.012*i/20.0);
+        struct Point{int step;double force;double tangent;double work;Pinching4StateKind kind;};
+        const Point points[]={{40,62.22999770316504,1450.0018973854026,0.1795242523682835,Pinching4StateKind::PositiveEnvelope},
+            {41,56.430009420313084,28999.941414259767,0.1676582516559357,Pinching4StateKind::PositiveToNegative},
+            {56,-30.45630604728855,13311.117376641287,0.12885660888164763,Pinching4StateKind::PositiveToNegative},
+            {67,-59.131915014958025,662.3850364545071,0.22801250131106024,Pinching4StateKind::PositiveToNegative},
+            {72,-59.90999466734839,1450.0018973854026,0.28748717830583914,Pinching4StateKind::NegativeEnvelope},
+            {80,-62.22999770316503,1450.0018973854026,0.3851991722022499,Pinching4StateKind::NegativeEnvelope},
+            {81,-56.43000942031308,28999.941414259767,0.3733331714899021,Pinching4StateKind::NegativeToPositive},
+            {95,24.769826539614265,28999.941414259767,0.32900891545692373,Pinching4StateKind::NegativeToPositive},
+            {96,30.426787354277263,9231.136954424634,0.3345285768463129,Pinching4StateKind::NegativeToPositive},
+            {104,59.96642560843609,9231.136954424634,0.4791577175866542,Pinching4StateKind::NegativeToPositive},
+            {105,62.31037347435234,356.87499126204204,0.5158407573114907,Pinching4StateKind::NegativeToPositive},
+            {107,62.73862346386679,356.87499126204204,0.5908701554744222,Pinching4StateKind::NegativeToPositive},
+            {108,63.38999922107336,1450.0018973854026,0.6287087422799043,Pinching4StateKind::PositiveEnvelope},
+            {112,66.68955359846188,204.05715985559664,0.7849666108220494,Pinching4StateKind::PositiveEnvelope},
+            {120,67.66902796576875,204.05715985559664,1.1074272065762027,Pinching4StateKind::PositiveEnvelope}};
+        double work=0.0,previous_force=0.0,previous_deformation=0.0;
+        for(int step=0;step<=120;++step){
+            const double deformation=protocol[static_cast<std::size_t>(step)];
+            if(step==41||step==81){
+                const auto a=m.trial(deformation,state),b=m.trial(deformation,state);
+                near(a.response.force,b.response.force,1e-13,"Pinching4 trial purity");
+                const auto expected=step==41?Pinching4StateKind::PositiveEnvelope:Pinching4StateKind::NegativeEnvelope;
+                check(state.kind==expected,"Pinching4 trial mutated committed state");
+            }
+            const auto trial=m.trial(deformation,state);
+            if(step>0)work+=0.5*(previous_force+trial.response.force)*(deformation-previous_deformation);
+            for(const auto& point:points)if(point.step==step){
+                near(trial.response.force,point.force,1e-11,"Pinching4 cyclic force oracle");
+                near(trial.response.tangent,point.tangent,1e-11,"Pinching4 cyclic tangent oracle");
+                near(work,point.work,1e-10,"Pinching4 cyclic work oracle");
+                check(trial.state.kind==point.kind,"Pinching4 cyclic state mismatch");
+            }
+            previous_force=trial.response.force;previous_deformation=deformation;state=trial.state;
+        }
+        check(state.reversal_count==2,"Pinching4 reversal history mismatch");
+        rejects([&]{(void)m.trial(0.0108,state);});
+    }
 
     // Rigid translation and rigid rotation must not create member force.
     SteelMember2D e(1.2,-.5,4.0,2.3,steel());auto s=e.initial_state();
@@ -123,6 +232,6 @@ int main(){try{
         check(a.termination==AnalysisTermination::Completed&&b2.termination==AnalysisTermination::Completed,"nonlinear damper NRHA failed");
         near(a.final_displacement[0],b2.final_displacement[0],2e-11,"nonlinear damper solver mismatch");
     }
-    std::cout<<"steel members, panel zones, BRBs, viscous dampers, rollback, Jacobians, and NRHA checks passed\n";
+    std::cout<<"steel members, Pinching4 first two reversals, panel zones, BRBs, viscous dampers, rollback, Jacobians, and NRHA checks passed\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -1,0 +1,125 @@
+name: phase9n-record-pilot
+
+on:
+  push:
+    branches: [phase9m-yori-wall-10001]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  multi-record-pilot:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
+
+      - name: Install OpenSeesPy 3.8.0
+        run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
+
+      - name: Build QuakeCore
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUAKE_ENABLE_SANITIZERS=OFF
+          cmake --build build -j2 --target quake_run
+
+      - name: Acquire and verify FEMA P-695 far-field source packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase9n_source
+          curl -L --fail --retry 3 -o phase9n_source/1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls \
+            https://s3-us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls
+          curl -L --fail --retry 3 -o phase9n_source/2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip \
+            https://s3.us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip
+          curl -L --fail --retry 3 -o phase9n_source/2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip \
+            https://s3.us-west-2.amazonaws.com/static-assets.hbrisk.com/ground-motion-sets/2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip
+          cat > phase9n_source/SHA256SUMS.txt <<'EOF'
+          e775ee429b4311dc1c8b362b78640523fa331445a46e8cee8f15138f9acde1bb  1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls
+          340ea47176323c363634b456c317e553dbcfced503f3e82827355a23145b9638  2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip
+          4b27774cafba4cef394fcda21a037ac08a452b3006e5899daddc47dd8d832b42  2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip
+          EOF
+          (cd phase9n_source && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path("phase9n_source")
+          names = [
+              "1_ReadMe_ATC-63_GroundMotionSet_FarField_SummaryFile.xls",
+              "2b_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Original.zip",
+              "2c_ATC-63_Far-Field_GroundMotionAccelTextFiles_Unscaled_Sorted.zip",
+          ]
+          with zipfile.ZipFile("phase9n_source_archive.zip", "w", zipfile.ZIP_DEFLATED) as zf:
+              for name in names:
+                  zf.write(root / name, arcname=name)
+          PY
+
+      - name: Build metadata-only 44-component record manifest
+        run: |
+          python validation/yori_wall_10001/phase9n_build_record_manifest.py \
+            --source-archive phase9n_source_archive.zip \
+            --out phase9n_record_manifest.json
+          python - <<'PY'
+          import json
+          m=json.load(open("phase9n_record_manifest.json"))
+          assert m["component_count"] == 44
+          assert m["pair_count"] == 22
+          assert len(m["records"]) == 44
+          print("manifest:", m["component_count"], "components /", m["pair_count"], "pairs")
+          PY
+
+      - name: Materialize reconstructed exact-law base job
+        run: |
+          python validation/yori_wall_10001/materialize_reconstructed_job.py \
+            --model-input validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt \
+            --output reconstructed_job.json
+
+      - name: Reproduce Phase 9M record 120111 from archived source
+        run: |
+          python validation/yori_wall_10001/phase9n_materialize_record_job.py \
+            --base-job reconstructed_job.json \
+            --source-archive phase9n_source_archive.zip \
+            --manifest phase9n_record_manifest.json \
+            --record-id 120111 \
+            --scale 0.03 \
+            --out reproduced_120111.json
+          python - <<'PY'
+          import json
+          base=json.load(open("reconstructed_job.json"))
+          regen=json.load(open("reproduced_120111.json"))
+          a=base["records"][0]["acceleration"]
+          b=regen["records"][0]["acceleration"]
+          assert len(a) == len(b) == 2999
+          assert abs(base["records"][0]["dt"] - regen["records"][0]["dt"]) < 1e-15
+          err=max(abs(x-y) for x,y in zip(a,b))
+          print("120111 maximum acceleration-vector reproduction error:", err)
+          assert err <= 1e-12
+          PY
+          rm reproduced_120111.json
+
+      - name: Run Phase 9N four-pair low-intensity pilot
+        run: |
+          python validation/yori_wall_10001/compare_phase9n_record_suite.py \
+            --base-job reconstructed_job.json \
+            --source-archive phase9n_source_archive.zip \
+            --manifest phase9n_record_manifest.json \
+            --quake-exe ./build/quake_run \
+            --record-ids 120111 120112 120621 120622 120921 120922 121321 121322 \
+            --scale 0.03 \
+            --out-dir phase9n_pilot \
+            --assert-engineering-parity
+
+      - name: Upload Phase 9N pilot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9n-yori-record-pilot
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            phase9n_record_manifest.json
+            phase9n_pilot/suite_summary.json
+            phase9n_pilot/*/comparison.json
+            phase9n_pilot/*/quakecore.json
+            phase9n_pilot/*/quakecore_stdout.txt

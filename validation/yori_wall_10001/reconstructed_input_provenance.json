@@ -1,0 +1,20 @@
+{
+  "schema": "yori.reconstructed_model_input.v1",
+  "archetype": "SpecialNonbearingRCSW/10001",
+  "status": "surrogate reconstruction; not the lost received source file",
+  "reconstructed_sha256": "22203092a1d125d59ced2a3777a9120ba9209d190ea32f6c71107f9c97403cf3",
+  "lost_received_expected_sha256": "02eca2fbdde5d2cc1400be354802a2b26d6d79ce15ac94dd981cd26dc6b23104",
+  "row_count": 3,
+  "values_per_row": 41,
+  "active_field_basis": {
+    "story_1": "Frozen OpenSees 3.8.0 oracle + matched-law QuakeCore job + recovered P4 Tcl mapping.",
+    "story_2": "ASCE4123 modeling workbook shows same section/material inputs as story 1; reconstructed active material row equal to story 1.",
+    "story_3": "Matched-law QuakeCore job preserves confined Concrete01 fc/epsc and shear first-branch stiffness; ASCE4123 workbook preserves geometry/reinforcement. Same steel backbone; shear force ordinates retained and deformation ordinates doubled for single 144-in element."
+  },
+  "explicit_assumptions": [
+    "Original MinMax limits are unavailable. Use -0.075/+0.075, the protocol-scoped surrogate already used in QuakeCore Gate 4 to reproduce the frozen failure bracket (0.073, 0.080].",
+    "Legacy Concrete02-only fields at indices 2-4,6,9-11,13 do not affect 1004_Materials_P4.tcl. Known matched-law values are retained for fcu/epsu; unused lambda/Ets placeholders are 0.",
+    "Story-3 Pinching4 reinforcing-steel backbone is taken equal to stories 1-2 because fyE is identical and the recovered post-pushover calibration scales steel d3/d4 globally across all stories.",
+    "This reconstruction can establish QuakeCore/OpenSees parity for the surrogate model, but cannot prove identity to the lost received file."
+  ]
+}

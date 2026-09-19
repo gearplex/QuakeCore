@@ -19,4 +19,15 @@ with tempfile.TemporaryDirectory() as tmp:
     for value in ['FSAM','unsupported']:
         k=copy.deepcopy(j);k['model']['walls'][0]['panels'][0]['material']['type']=value;run(k,2)
     k=copy.deepcopy(j);k['model']['walls'][0]['local_max_iterations']=2.5;run(k,2)
+
+    # Gate 4 runner contract: instantiate ConcreteCM + Pinching4 wrapped in
+    # MinMax/Parallel, with Pinching4 also used as MVLEM shear. Zero excitation
+    # keeps this test focused on parsing, construction, state allocation, and
+    # the normal quake_run execution path rather than constitutive calibration.
+    k=copy.deepcopy(base);k['records'][0]['acceleration']=[0.0]*5
+    cm={'type':'concrete_cm','fc':-6.5,'epsc':-.002,'Ec':4595.486916530173,'rc':7.0,'xcrn':1.03,'ft':.0604669,'et':2*.0604669/4595.486916530173,'rt':1.2,'xcrp':10000.0,'gap_close':True}
+    pinch={'type':'pinching4','positive':[[1.0,10.0],[2.0,20.0],[3.0,30.0],[4.0,40.0]],'negative':[[-1.0,-10.0],[-2.0,-20.0],[-3.0,-30.0],[-4.0,-40.0]],'r_disp_positive':.6,'r_force_positive':.99,'u_force_positive':.4,'r_disp_negative':.6,'r_force_negative':.99,'u_force_negative':.4,'gamma_k':[0,0,0,0],'gamma_k_limit':2.0,'gamma_d':[.1,0,0,0],'gamma_d_limit':2.0,'gamma_f':[0,0,0,0],'gamma_f_limit':2.0,'gamma_e':10000.0,'damage_mode':'energy','admitted_reversal_count':2}
+    wrapped={'type':'parallel','materials':[{'type':'minmax','min':-10.0,'max':10.0,'material':pinch},{'type':'elastic','E':.01}]}
+    k['model']['walls'][0]['fibers'][0]['concrete']=cm;k['model']['walls'][0]['fibers'][0]['steel']=wrapped;k['model']['walls'][0]['shear']=pinch
+    r=run(k,0);assert r['runs'][0]['history'][0]['walls']['1']['fiber_strain']
 print('wall JSON contracts passed')

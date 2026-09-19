@@ -1,0 +1,57 @@
+{
+  "scope": "matched Concrete01/Steel01/bilinear shear with gravity state and leaning-column P-Delta",
+  "quakecore_gravity_residual": 7.031530913081951e-11,
+  "opensees_gravity_reactions": {
+    "ok": true,
+    "elapsed_seconds": 0.003465406999566767,
+    "wall_base_reaction": [
+      0.0,
+      555.9750000000003,
+      0.0
+    ],
+    "lean_base_reaction": [
+      -2.1511042632239645e-17,
+      1650.712500000001,
+      -2.602110928649455e-24
+    ],
+    "story_wall_vertical_displacement": [
+      -0.016149328712876495,
+      -0.026713224643475583,
+      -0.03156030594454819
+    ],
+    "story_lean_vertical_displacement": [
+      -2.3770260000000013e-05,
+      -3.952249200000002e-05,
+      -4.725669600000003e-05
+    ]
+  },
+  "quakecore_periods_seconds": [
+    1.255015243745982,
+    0.184586584969279,
+    0.10510460405552137
+  ],
+  "opensees_periods_seconds": [
+    1.2550152437458038,
+    0.18458658496920455,
+    0.10510460405552163
+  ],
+  "quakecore_peak_story_drift_ratio": [
+    0.0009702078289736229,
+    0.002046109134102612,
+    0.0024632822728541787
+  ],
+  "opensees_peak_story_drift_ratio": [
+    0.0009702078289718185,
+    0.0020461091340871155,
+    0.002463282272842907
+  ],
+  "max_floor_displacement_difference_in": 5.353321952394907e-11,
+  "max_story_drift_difference": 1.9150038000660674e-13,
+  "story_drift_rmse_percent_of_peak": [
+    1.7552833481451536e-09,
+    1.7402349049612852e-09,
+    1.7238814689423697e-09
+  ],
+  "quakecore_integration_seconds": 0.194304858,
+  "opensees_integration_seconds": 0.17493298200042773
+}

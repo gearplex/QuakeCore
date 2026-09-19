@@ -1,0 +1,113 @@
+name: reconstructed-yori-parity
+on:
+  push:
+    branches: [phase9m-yori-wall-10001]
+  pull_request:
+    branches: [main]
+
+jobs:
+  exact-surrogate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libsuperlu-dev liblapack-dev
+      - name: Install OpenSeesPy 3.8.0
+        run: python -m pip install --upgrade "openseespy==3.8.0.0" numpy
+      - name: Build QuakeCore
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DQUAKE_ENABLE_SANITIZERS=OFF
+          cmake --build build -j2 --target quake_run
+      - name: Materialize reconstructed exact-law job
+        run: |
+          python validation/yori_wall_10001/materialize_reconstructed_job.py \
+            --model-input validation/yori_wall_10001/AllStoriesOpenseesModelINPUT.reconstructed_10001.txt \
+            --output reconstructed_job.json
+      - name: Run QuakeCore reconstructed exact-law job
+        continue-on-error: true
+        run: ./build/quake_run reconstructed_job.json quake_reconstructed.json
+      - name: Trace ConcreteCM fiber state
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p reconstructed_comparison
+          python - <<'PY'
+          import json
+          q=json.load(open('quake_reconstructed.json'))
+          h=q['runs'][0]['history']
+          with open('wall5_fiber0_strains.txt','w') as f0, open('wall3_fiber7_strains.txt','w') as f7:
+              for row in h:
+                  w5=row['walls']['5'] if '5' in row['walls'] else row['walls'][5]
+                  w3=row['walls']['3'] if '3' in row['walls'] else row['walls'][3]
+                  f0.write(f"{w5['fiber_strain'][0]:.17g}\n")
+                  f7.write(f"{w3['fiber_strain'][7]:.17g}\n")
+          PY
+          g++ -std=c++20 -O2 -Iinclude validation/yori_wall_10001/concrete_cm_state_trace.cpp src/concrete_cm.cpp -o concrete_cm_state_trace
+          ./concrete_cm_state_trace wall5_fiber0_strains.txt reconstructed_comparison/concrete_cm_state_trace.csv
+          ./concrete_cm_state_trace wall3_fiber7_strains.txt reconstructed_comparison/wall3_fiber7_state_trace.csv \
+            -8.01435 -0.00432976 5102.805419570689 7.0 1.015 \
+            0.0671422 2.6315798655575164e-05 1.2 10000.0 1
+      - name: Replay wall material histories against OpenSeesPy
+        if: always()
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/diagnose_material_history_parity.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --out reconstructed_comparison/material_history_diagnostic.json
+      - name: Compare common-prefix wall force EDPs
+        run: |
+          python validation/yori_wall_10001/compare_wall_force_edps.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --steps 1000 \
+            --out reconstructed_comparison/wall_force_edp_summary.json
+      - name: Benchmark common 1000-step exact-law prefix
+        run: |
+          python validation/yori_wall_10001/benchmark_reconstructed_prefix.py \
+            --job reconstructed_job.json \
+            --quake-exe ./build/quake_run \
+            --steps 1000 \
+            --repetitions 7 \
+            --out reconstructed_comparison/runtime_prefix_1000.json
+      - name: Strict full-trace comparator diagnostic
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/compare_reconstructed_exact_10001.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --out reconstructed_comparison \
+            --assert-parity
+      - name: Assess engineering parity
+        run: |
+          python validation/yori_wall_10001/assess_engineering_parity.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --response-summary reconstructed_comparison/reconstructed_exact_summary.json \
+            --wall-force-summary reconstructed_comparison/wall_force_edp_summary.json \
+            --out reconstructed_comparison/engineering_parity_summary.json
+      - name: Robust OpenSees full-record diagnostic
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/compare_reconstructed_robust_opensees.py \
+            --job reconstructed_job.json \
+            --quake quake_reconstructed.json \
+            --max-depth 6 \
+            --out reconstructed_comparison/robust_opensees_full_record.json
+      - name: Multi-intensity engineering parity diagnostic
+        continue-on-error: true
+        run: |
+          python validation/yori_wall_10001/compare_reconstructed_intensity_suite.py \
+            --job reconstructed_job.json \
+            --quake-exe ./build/quake_run \
+            --scales 0.5 1.0 2.0 4.0 \
+            --out reconstructed_comparison/intensity_suite.json
+      - name: Upload reconstructed parity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconstructed-yori-parity
+          path: |
+            reconstructed_job.json
+            quake_reconstructed.json
+            reconstructed_comparison/
+          if-no-files-found: warn
