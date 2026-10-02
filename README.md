@@ -10,6 +10,10 @@ The current development branch adds nonlinear static gravity equilibration and s
 
 This is software verification and independent numerical comparison, not FEMA P-695 acceptance. The exact YORi ConcreteCM + Pinching4 + MinMax + Parallel constitutive stack remains the Phase 9M validation gate. See `docs/PHASE9M_YORI_10001_VALIDATION.md` and `validation/yori_wall_10001/README.md`.
 
+## C2 deficiency-to-fragility research pilot
+
+The research branch also contains a [frozen pilot protocol](research/c2_deficiency_fragility/README.md) for mapping two ASCE 41 Tier 1 screening concerns—a concentrated first-story mechanism and nonductile shear/axial degradation—to collapse-fragility consequences in a FEMA P-2018-inspired C2 frame-wall archetype. OpenSees is the primary engine for the first scientific result; QuakeCore remains a shadow solver until it passes the protocol's predeclared cross-solver gate. The model input is intentionally marked incomplete until every reconstruction parameter has traceable provenance.
+
 ## Current objective
 
 Test the central solver and compiler hypotheses before writing GPU code:

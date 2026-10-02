@@ -1,0 +1,86 @@
+{
+  "schema_version": "0.1.0",
+  "archetype_id": "C2-6S-6B-1W-P2018D-reconstruction",
+  "status": "incomplete_not_executable",
+  "units": {
+    "length": "in",
+    "force": "kip",
+    "time": "sec"
+  },
+  "geometry": {
+    "stories": 6,
+    "bays": 6,
+    "story_heights_in": null,
+    "bay_widths_in": null,
+    "wall": {
+      "count": 1,
+      "length_in": 240.0,
+      "thickness_in": 10.0,
+      "location": null
+    },
+    "documented_wall_index": 0.0004,
+    "documented_effective_period_sec": 1.20,
+    "effective_period_note": "FEMA P-2018 Table D-1 value from pushover; not the elastic T1_ref used for scaling"
+  },
+  "materials": {
+    "frame_concrete_ksi": null,
+    "wall_concrete_ksi": null,
+    "reinforcing_steel_yield_ksi": null,
+    "provenance": null
+  },
+  "members": {
+    "columns": null,
+    "beams": null,
+    "wall_reinforcement": {
+      "description": "unconfined wall with #4 bars at 12 inches on center",
+      "web_longitudinal_ratio": null,
+      "web_transverse_ratio": null,
+      "boundary_reinforcement": null
+    }
+  },
+  "mass_and_gravity": {
+    "floor_weights_kip": null,
+    "column_axial_loads_kip": null,
+    "wall_axial_loads_kip": null,
+    "leaning_column_definition": null
+  },
+  "analysis": {
+    "damping_model": null,
+    "damping_ratio": 0.05,
+    "gravity_steps": null,
+    "pushover_pattern": null,
+    "transient_integrator": null,
+    "convergence_tests": null,
+    "recovery_policy": null
+  },
+  "case_parameters": {
+    "C2-RF": {
+      "first_story_strength_ratio": 1.0,
+      "shear_axial_degradation": false,
+      "column_flexural_to_shear_strength_ratio": 0.6
+    },
+    "C2-RB": {
+      "first_story_strength_ratio": 1.0,
+      "shear_axial_degradation": true,
+      "column_flexural_to_shear_strength_ratio": 1.2
+    },
+    "C2-SF": {
+      "first_story_strength_ratio": null,
+      "shear_axial_degradation": false,
+      "column_flexural_to_shear_strength_ratio": 0.6
+    },
+    "C2-SB": {
+      "first_story_strength_ratio": null,
+      "shear_axial_degradation": true,
+      "column_flexural_to_shear_strength_ratio": 1.2
+    }
+  },
+  "required_before_execution": [
+    "replace every null physical or analysis parameter",
+    "attach a source and engineering rationale to every non-derived parameter",
+    "freeze the strength-normalization algorithm",
+    "freeze component deterioration laws and axial-loss behavior",
+    "verify how #4 at 12 inches applies to each wall reinforcement direction and face",
+    "validate units and deterministic model hash"
+  ]
+}
