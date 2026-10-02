@@ -1,0 +1,4 @@
+# Analysis-only dependencies; not QuakeCore runtime requirements.
+openseespy==3.8.0.0
+scipy>=1.10,<2
+

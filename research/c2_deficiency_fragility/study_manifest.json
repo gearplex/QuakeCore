@@ -1,0 +1,143 @@
+{
+  "schema_version": "0.1.0",
+  "study_id": "c2_deficiency_fragility_pilot",
+  "status": "protocol_frozen_model_pending",
+  "claim_boundary": "Research comparison only; not an ASCE 41 evaluation, FEMA P-695 qualification, or code-compliance claim.",
+  "source_basis": [
+    {
+      "id": "hagen_2026_framework",
+      "title": "A Deficiency-Based Minimum Safety Objective for Existing Buildings",
+      "date": "2026-08-24",
+      "availability": "controlled project source; not copied into repository"
+    },
+    {
+      "id": "hagen_seaoc_2026_deck",
+      "title": "Priority Deficiencies and a Fragility-Based Framework",
+      "date": "2026",
+      "availability": "controlled project source; not copied into repository"
+    },
+    {
+      "id": "fema_p2018",
+      "title": "Seismic Evaluation of Older Concrete Buildings for Collapse Potential",
+      "publisher": "FEMA/ATC",
+      "year": 2018,
+      "archetype_location": "Appendix D",
+      "collapse_definition": "50 percent loss of peak story lateral resistance"
+    }
+  ],
+  "archetype": {
+    "classification": "C2-type reinforced-concrete frame-wall building",
+    "dimension": "2D",
+    "stories": 6,
+    "bays": 6,
+    "diaphragm": "stiff in-plane",
+    "reference_wall_count": 1,
+    "reference_wall_length_ft": 20.0,
+    "reference_wall_thickness_in": 10.0,
+    "source_identity": "documented reconstruction patterned after FEMA P-2018 Appendix D; not source-model identity",
+    "parameter_file": "archetype.json"
+  },
+  "cases": [
+    {
+      "id": "C2-RF",
+      "vertical_distribution": "regular",
+      "component_behavior": "flexure_governed",
+      "role": "reference"
+    },
+    {
+      "id": "C2-RB",
+      "vertical_distribution": "regular",
+      "component_behavior": "shear_axial_degrading",
+      "role": "brittle_behavior_main_effect"
+    },
+    {
+      "id": "C2-SF",
+      "vertical_distribution": "first_story_mechanism",
+      "component_behavior": "flexure_governed",
+      "role": "story_mechanism_main_effect"
+    },
+    {
+      "id": "C2-SB",
+      "vertical_distribution": "first_story_mechanism",
+      "component_behavior": "shear_axial_degrading",
+      "role": "interaction"
+    }
+  ],
+  "comparison_design": {
+    "primary": "constant_global_strength_floor",
+    "secondary": "as_observed_strength_and_reserve_combined",
+    "strength_anchor": {
+      "definition": "first significant inelasticity under monotonic lateral loading",
+      "target": "common normalized base-shear coefficient",
+      "tolerance_fraction": null,
+      "status": "must be frozen before analysis"
+    }
+  },
+  "intensity_measures": {
+    "primary": {
+      "name": "Sa(T1_ref)",
+      "damping_ratio": 0.05,
+      "reference_period_case": "C2-RF",
+      "units": "g"
+    },
+    "spectral_shape_sensitivity": {
+      "name": "AvgSa",
+      "period_band": null,
+      "weighting": null,
+      "status": "must be frozen before analysis"
+    }
+  },
+  "limit_states": [
+    {
+      "id": "L0",
+      "name": "first_significant_inelasticity",
+      "classification": "calibration_not_collapse"
+    },
+    {
+      "id": "L1",
+      "name": "component_cp_threshold",
+      "classification": "performance_not_automatic_collapse"
+    },
+    {
+      "id": "L2",
+      "name": "story_resistance_below_50_percent_peak",
+      "classification": "primary_global_collapse_proxy"
+    },
+    {
+      "id": "L3",
+      "name": "dynamic_instability_or_gravity_support_loss",
+      "classification": "physical_collapse"
+    }
+  ],
+  "run_statuses": [
+    "completed",
+    "response_limit_crossed",
+    "classified_collapse",
+    "numerical_noncompletion",
+    "initial_instability"
+  ],
+  "statistical_model": {
+    "distribution": "lognormal",
+    "fit": "interval_left_right_censored_maximum_likelihood",
+    "confidence_interval": "record_bootstrap",
+    "primary_probability": 0.01,
+    "reference_effective_beta": 0.60,
+    "raw_record_dispersion_is_not_effective_beta": true
+  },
+  "solver_roles": {
+    "primary": "OpenSees",
+    "shadow": "QuakeCore",
+    "quakecore_promotion_gate": "See README section 7"
+  },
+  "open_items": [
+    "licensed ASCE 41 Tier 1 checklist crosswalk",
+    "complete archetype parameters and provenance",
+    "strength-anchor tolerance",
+    "ground-motion set and immutable record manifest",
+    "AvgSa period band and weighting",
+    "component degradation calibration",
+    "OpenSees-to-QuakeCore frozen comparison tolerances",
+    "Phase 9N record 120521 disposition"
+  ]
+}
+
